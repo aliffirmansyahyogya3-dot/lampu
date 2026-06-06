@@ -1,399 +1,548 @@
 /* ═══════════════════════════════════════════════════════════
-   STYLE.CSS — Edison Bulb v2 (bohlam menghadap ke bawah)
+   STYLE.CSS — Edison Bulb Interactive
+   Semua efek visual berbasis CSS murni
    ═══════════════════════════════════════════════════════════ */
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
-:root {
-  --on-duration:  300ms;
-  --off-duration: 500ms;
-  --ease-on:  cubic-bezier(0.22,1,0.36,1);
-  --ease-off: cubic-bezier(0.55,0,0.45,1);
-  --bulb-w: 240px;
+/* ─── RESET & BASE ─────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
+:root {
+  /* Warna dasar */
+  --bg-dark:      #111111;
+  --bg-room:      #0d0d0d;
+  --wire-color:   #2a2010;
+  --socket-dark:  #1a1208;
+  --socket-mid:   #3a2808;
+  --socket-light: #7a5018;
+
+  /* Warna filamen */
+  --filament-off:  #3a2200;
+  --filament-warm: #ff9500;
+  --filament-hot:  #ffcc44;
+
+  /* Warna cahaya */
+  --light-warm:   #ff9a00;
+  --light-bloom:  #ffb830;
+  --light-outer:  #ff8000;
+
+  /* Timing */
+  --on-duration:  300ms;
+  --off-duration: 500ms;
+  --easing-on:    cubic-bezier(0.22, 1, 0.36, 1);
+  --easing-off:   cubic-bezier(0.55, 0, 0.45, 1);
+
+  /* Ukuran lampu */
+  --bulb-size-desktop: 300px;
+  --bulb-size-mobile:  200px;
+}
+
+/* ─── FONT ──────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Share+Tech+Mono&display=swap');
+
+/* Fallback jika font tidak load */
+body {
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+}
+
+/* ─── HTML & BODY ───────────────────────────────────────── */
 html, body {
-  width: 100%; height: 100%; overflow: hidden;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
-  font-family: 'Share Tech Mono', 'Courier New', monospace;
-  background: radial-gradient(ellipse 90% 70% at 50% 0%, #181410 0%, #0e0d0b 55%, #080807 100%);
-  background-color: #0d0d0b;
+  /* Ruangan gelap dengan gradasi sangat halus */
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 30%, #181510 0%, #0d0d0d 60%, #080808 100%);
+  background-color: var(--bg-dark);
+
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  color: #b09040;
+
+  /* Mencegah flash putih saat load */
+  color: #c8a060;
 }
 
-/* ── CANVAS layers ── */
-#glowCanvas, #particleCanvas {
+/* ─── CANVAS (volumetric glow, dirender di belakang) ────── */
+#glowCanvas {
   position: fixed;
-  inset: 0; width: 100%; height: 100%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Pointer events none agar tidak menghalangi klik */
   pointer-events: none;
   z-index: 0;
 }
-#particleCanvas { z-index: 3; }
 
-/* ── SCENE ── */
+/* ─── SCENE CONTAINER ────────────────────────────────────── */
 .scene {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 0;
   z-index: 1;
 }
 
-/* ══════════════════════════════════════════════
-   KABEL DARI LANGIT-LANGIT
-══════════════════════════════════════════════ */
-.ceiling-wire {
-  display: flex;
-  justify-content: center;
-}
-.wire-top {
-  width: 3px;
-  height: 70px;
-  background: linear-gradient(to bottom,
-    transparent 0%,
-    #151008 15%,
-    #2a1f08 50%,
-    #3a2c10 80%,
-    #2a2008 100%
-  );
-  position: relative;
-  border-radius: 2px;
-}
-/* Highlight kabel */
-.wire-top::after {
-  content: '';
-  position: absolute;
-  left: 50%; top: 10%;
-  width: 1px; height: 80%;
-  background: linear-gradient(to bottom, transparent, #8a6428 50%, transparent);
-  opacity: 0.5;
-}
-
-/* ══════════════════════════════════════════════
-   SOCKET ASSEMBLY (di atas bohlam, sambung ke kabel)
-══════════════════════════════════════════════ */
-.socket-assembly {
+/* ─── KABEL & SOKET ─────────────────────────────────────── */
+.wire-assembly {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: -1px;
+  position: relative;
+  z-index: 2;
 }
 
-/* Tutup atas socket (nyambung ke kabel) */
-.socket-cap {
-  width: 40px; height: 12px;
-  background: linear-gradient(to right,
-    #1a1208, #4a3410, #7a5818, #9a7025, #7a5818, #4a3410, #1a1208
+.wire {
+  width: 2px;
+  height: 60px;
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    #1a1208 20%,
+    #2e1f08 60%,
+    #3a2808 100%
   );
-  border-radius: 3px 3px 0 0;
-  border: 1px solid rgba(180,120,30,0.3);
-  border-bottom: none;
+  position: relative;
 }
 
-/* Badan socket */
-.socket-body {
-  width: 68px;
+/* Highlight kabel */
+.wire::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(to bottom,
+    transparent,
+    #7a5018 50%,
+    transparent
+  );
+  opacity: 0.4;
+}
+
+/* Socket Edison (logam kuningan vintage) */
+.socket {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  width: 64px;
 }
 
-.socket-ring {
-  height: 9px;
-  background: linear-gradient(to right,
-    #100c04, #5a3c0c, #c89030, #f0c040, #c89030, #5a3c0c, #100c04
+.socket-band {
+  height: 8px;
+  width: 100%;
+  border-radius: 2px;
+}
+
+.socket-band--top {
+  background: linear-gradient(to bottom,
+    #2a1a08, #6a4818, #8a6020, #4a3010
   );
 }
-.socket-ring--top { border-radius: 2px 2px 0 0; }
-.socket-ring--bottom { border-radius: 0 0 2px 2px; }
 
-.socket-barrel {
-  height: 38px;
+.socket-body {
+  width: 100%;
+  height: 36px;
   background: linear-gradient(to right,
-    #0e0a04 0%,
-    #3a2808 12%,
-    #8a6018 28%,
-    #d4a030 42%,
-    #f0c040 50%,
-    #d4a030 58%,
-    #8a6018 72%,
-    #3a2808 88%,
-    #0e0a04 100%
+    #1a1208 0%,
+    #3a2808 15%,
+    #7a5018 30%,
+    #c8902a 45%,
+    #e8b040 50%,
+    #c89030 55%,
+    #7a5018 70%,
+    #3a2808 85%,
+    #1a1208 100%
   );
   position: relative;
   overflow: hidden;
 }
-/* Ulir socket */
-.socket-barrel::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0, transparent 5px,
-    rgba(0,0,0,0.3) 5px, rgba(0,0,0,0.3) 6px
-  );
-}
-/* Kilap logam */
-.socket-barrel::after {
+
+/* Tekstur ulir pada socket */
+.socket-body::before {
   content: '';
   position: absolute;
-  left: 42%; top: 0;
-  width: 12%; height: 100%;
-  background: linear-gradient(to right, transparent, rgba(255,220,100,0.35), transparent);
-}
-
-/* Base socket bawah (nyambung ke bohlam) */
-.socket-base {
-  width: 100%;
-  height: 8px;
-  background: linear-gradient(to right,
-    #0e0a04, #5a3c0c, #9a7020, #c89030, #9a7020, #5a3c0c, #0e0a04
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 4px,
+    rgba(0,0,0,0.25) 4px,
+    rgba(0,0,0,0.25) 5px
   );
-  border-radius: 0 0 3px 3px;
-  border: 1px solid rgba(160,100,20,0.3);
-  border-top: none;
-  width: 68px;
 }
 
-/* ══════════════════════════════════════════════
-   BOHLAM WRAPPER — globe menghadap ke bawah
-══════════════════════════════════════════════ */
+/* Highlight logam */
+.socket-body::after {
+  content: '';
+  position: absolute;
+  left: 35%;
+  top: 0;
+  width: 15%;
+  height: 100%;
+  background: linear-gradient(to right,
+    transparent,
+    rgba(255,200,80,0.35),
+    transparent
+  );
+}
+
+.socket-band--bottom {
+  background: linear-gradient(to bottom,
+    #5a3c10, #3a2808, #1a1208
+  );
+}
+
+/* ─── BULB WRAPPER ───────────────────────────────────────── */
 .bulb-wrapper {
   position: relative;
-  width: var(--bulb-w);
-  height: calc(var(--bulb-w) * 1.23);
+  width: var(--bulb-size-desktop);
+  /* Tinggi proporsional SVG viewBox (340/260) */
+  height: calc(var(--bulb-size-desktop) * 1.31);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  margin-top: -2px;
+  margin-top: -4px; /* sambung ke socket */
   z-index: 2;
 }
 
-/* SVG dibalik: leher di atas (ketemu socket), globe di bawah */
 #bulbSVG {
   width: 100%;
   height: 100%;
-  overflow: visible;
-  /* FLIP: leher di atas, dome di bawah */
-  transform: scaleY(-1);
+  overflow: visible; /* biar filter tidak terpotong */
   position: relative;
   z-index: 2;
 }
 
-/* Karena SVG diflip, teks/elemen di dalam juga perlu counter-flip jika ada */
-
-/* ── FILAMEN ── */
+/* ─── FILAMEN — warna dan animasi ────────────────────────── */
 .filament-wire {
-  stroke: #4a2800;
+  /* State OFF: gelap kemerahan */
+  stroke: var(--filament-off);
   transition:
-    stroke var(--on-duration) var(--ease-on),
-    filter var(--on-duration) var(--ease-on);
-}
-.is-on .filament-wire {
-  stroke: #ffcc44;
+    stroke var(--on-duration) var(--easing-on),
+    filter var(--on-duration) var(--easing-on),
+    opacity var(--on-duration) var(--easing-on);
 }
 
-/* ── LIT GLASS ── */
+/* State ON: filamen pijar kuning-oranye */
+.is-on .filament-wire {
+  stroke: var(--filament-hot);
+  filter: drop-shadow(0 0 4px #ffcc44)
+          drop-shadow(0 0 10px #ff9900)
+          drop-shadow(0 0 20px #ff6600);
+}
+
+/* ─── LIT GLASS — kaca panas saat lampu menyala ─────────── */
 #litGlass {
   opacity: 0;
-  transition: opacity var(--on-duration) var(--ease-on);
+  transition: opacity var(--on-duration) var(--easing-on);
 }
-.is-on #litGlass { opacity: 0.38; }
 
-/* ══════════════════════════════════════════════
-   BLOOM CSS LAYERS
-══════════════════════════════════════════════ */
+.is-on #litGlass {
+  opacity: 0.35;
+}
+
+/* ─── BLOOM LAYERS (CSS, tambahan di atas Canvas) ──────── */
 .bloom-layer {
   position: absolute;
-  /* Bloom di bagian bawah (dome bohlam) */
-  bottom: 5%;
+  top: 15%;
   left: 50%;
   transform: translateX(-50%);
-  width: 65%;
-  height: 55%;
+  width: 60%;
+  height: 50%;
   border-radius: 50%;
   pointer-events: none;
   z-index: 1;
-  background: radial-gradient(ellipse at 50% 50%,
-    rgba(255,200,80,0) 0%, rgba(255,130,0,0) 60%, transparent 80%);
-  filter: blur(22px);
+
+  /* Bloom kuning warm saat OFF: tidak ada */
+  background: radial-gradient(ellipse at 50% 45%,
+    rgba(255, 180, 30, 0) 0%,
+    rgba(255, 140, 0, 0) 40%,
+    transparent 70%
+  );
+  filter: blur(20px);
   opacity: 0;
   transition:
-    opacity var(--on-duration) var(--ease-on),
-    transform var(--on-duration) var(--ease-on);
-  will-change: opacity, transform;
+    opacity var(--on-duration) var(--easing-on),
+    transform var(--on-duration) var(--easing-on);
 }
+
 .bloom-layer--outer {
-  width: 130%; height: 85%;
-  bottom: -5%;
-  filter: blur(45px);
+  width: 120%;
+  height: 80%;
+  top: 5%;
+  filter: blur(40px);
   z-index: 0;
 }
 
+/* Saat lampu ON */
 .is-on .bloom-layer {
-  background: radial-gradient(ellipse at 50% 50%,
-    rgba(255,230,110,0.95) 0%,
-    rgba(255,170,25,0.65) 30%,
-    rgba(255,100,0,0.32) 62%,
-    transparent 82%);
-  opacity: 1;
-}
-.is-on .bloom-layer--outer {
-  background: radial-gradient(ellipse at 50% 50%,
-    rgba(255,210,70,0.38) 0%,
-    rgba(255,140,0,0.22) 40%,
-    rgba(200,80,0,0.10) 68%,
-    transparent 85%);
+  background: radial-gradient(ellipse at 50% 45%,
+    rgba(255, 220, 100, 0.90) 0%,
+    rgba(255, 160, 20, 0.60) 30%,
+    rgba(255, 100, 0, 0.30) 60%,
+    transparent 80%
+  );
   opacity: 1;
 }
 
-/* ══════════════════════════════════════════════
-   SWITCH ZONE — tengah horizontal
-══════════════════════════════════════════════ */
-.switch-zone {
+.is-on .bloom-layer--outer {
+  background: radial-gradient(ellipse at 50% 45%,
+    rgba(255, 200, 60, 0.35) 0%,
+    rgba(255, 130, 0, 0.20) 40%,
+    rgba(200, 80, 0, 0.10) 65%,
+    transparent 80%
+  );
+  opacity: 1;
+}
+
+/* ─── SAKLAR TOGGLE ──────────────────────────────────────── */
+.switch-container {
   display: flex;
-  justify-content: center;
   align-items: center;
-  width: 100%;
-  margin-top: 32px;
+  gap: 14px;
+  margin-top: 28px;
   z-index: 3;
   position: relative;
 }
 
-.switch-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .switch-label {
   font-family: 'Share Tech Mono', monospace;
-  font-size: 0.75rem;
-  letter-spacing: 0.2em;
-  color: #3a2c10;
-  min-width: 24px;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  color: #5a4820;
+  min-width: 28px;
   text-align: center;
   transition: color 250ms ease;
   user-select: none;
 }
-.switch-label--on { color: #3a2c10; }
 
-body.is-on .switch-label { color: #6a5020; }
-body.is-on .switch-label--on { color: #d0a030; }
+.is-on + .switch-container .switch-label,
+body.is-on .switch-label {
+  color: #c89030;
+}
 
-/* Toggle track */
 .toggle-switch {
   position: relative;
-  width: 68px; height: 36px;
-  border-radius: 18px;
-  border: none; cursor: pointer;
-  outline: none; padding: 0;
+  width: 64px;
+  height: 34px;
+  border-radius: 17px;
+  border: none;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
   background: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Track saklar */
 .toggle-switch::before {
   content: '';
-  position: absolute; inset: 0;
-  border-radius: 18px;
-  background: linear-gradient(to bottom, #080604, #141008, #080604);
-  border: 1.5px solid #2a1e08;
+  position: absolute;
+  inset: 0;
+  border-radius: 17px;
+  background: linear-gradient(to bottom,
+    #0a0804 0%,
+    #1a1208 40%,
+    #0e0a04 100%
+  );
+  border: 1px solid #3a2808;
   box-shadow:
-    inset 0 2px 5px rgba(0,0,0,0.9),
-    inset 0 -1px 2px rgba(255,160,0,0.04);
-  transition: border-color 300ms ease, box-shadow 300ms ease;
-}
-.toggle-switch[aria-checked="true"]::before {
-  border-color: #7a5818;
-  box-shadow:
-    inset 0 2px 4px rgba(0,0,0,0.7),
-    0 0 14px rgba(255,150,0,0.45),
-    0 0 28px rgba(255,90,0,0.18);
+    inset 0 2px 4px rgba(0,0,0,0.8),
+    inset 0 -1px 2px rgba(255,160,0,0.05);
+  transition:
+    background 300ms ease,
+    box-shadow 300ms ease,
+    border-color 300ms ease;
 }
 
-/* Thumb */
+/* Thumb saklar */
 .toggle-thumb {
   position: absolute;
-  top: 4px; left: 4px;
-  width: 28px; height: 28px;
+  top: 3px;
+  left: 3px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: linear-gradient(135deg,
-    #3a2808 0%, #7a5418 35%, #b88030 58%, #7a5418 80%, #3a2808 100%);
+    #4a3510 0%,
+    #8a6020 40%,
+    #c89030 60%,
+    #8a6020 80%,
+    #5a4018 100%
+  );
   box-shadow:
-    0 2px 7px rgba(0,0,0,0.85),
-    0 0 0 1px rgba(180,120,30,0.3),
-    inset 0 1px 2px rgba(240,190,70,0.4);
+    0 2px 6px rgba(0,0,0,0.8),
+    0 0 0 1px rgba(200,144,48,0.3),
+    inset 0 1px 2px rgba(255,200,80,0.4);
   transition:
-    transform 280ms cubic-bezier(0.34,1.56,0.64,1),
+    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
     background 300ms ease,
     box-shadow 300ms ease;
   will-change: transform;
 }
+
+/* State ON — track menyala */
+.toggle-switch[aria-checked="true"]::before {
+  background: linear-gradient(to bottom,
+    #1a1000 0%,
+    #2a1c00 40%,
+    #1a1000 100%
+  );
+  border-color: #8a6020;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.6),
+    inset 0 -1px 2px rgba(255,160,0,0.2),
+    0 0 12px rgba(255, 140, 0, 0.35),
+    0 0 24px rgba(255, 100, 0, 0.15);
+}
+
+/* State ON — thumb bergerak ke kanan */
 .toggle-switch[aria-checked="true"] .toggle-thumb {
-  transform: translateX(32px);
+  transform: translateX(30px);
   background: linear-gradient(135deg,
-    #c07000 0%, #ffaa00 28%, #ffdd55 54%, #ffaa00 76%, #c07000 100%);
+    #c87000 0%,
+    #ffaa00 30%,
+    #ffcc44 55%,
+    #ffaa00 75%,
+    #c87000 100%
+  );
   box-shadow:
     0 2px 8px rgba(0,0,0,0.6),
-    0 0 0 1.5px rgba(255,190,0,0.6),
-    0 0 18px rgba(255,160,0,0.9),
-    0 0 36px rgba(255,100,0,0.45),
-    inset 0 1px 3px rgba(255,255,180,0.65);
+    0 0 0 1px rgba(255,180,0,0.5),
+    0 0 16px rgba(255,150,0,0.8),
+    0 0 32px rgba(255,100,0,0.4),
+    inset 0 1px 3px rgba(255,255,180,0.6);
 }
 
-/* ══════════════════════════════════════════════
-   AMBIENT BODY GLOW
-══════════════════════════════════════════════ */
+/* ─── HINT TEXT ──────────────────────────────────────────── */
+.hint-text {
+  margin-top: 16px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  color: #3a2c14;
+  text-align: center;
+  transition: color 400ms ease, opacity 400ms ease;
+  user-select: none;
+}
+
+.scene.is-on .hint-text {
+  color: #8a6428;
+  opacity: 0.7;
+}
+
+/* ─── AMBIENT ROOM LIGHT EFFECT ──────────────────────────── */
+/* Pseudo-element pada body untuk simulasi "ruangan ikut terang" */
 body::after {
   content: '';
-  position: fixed; inset: 0;
-  pointer-events: none; z-index: 0;
-  background: radial-gradient(ellipse 75% 60% at 50% 55%,
-    rgba(255,160,40,0) 0%, transparent 60%);
-  transition: background var(--on-duration) var(--ease-on);
-}
-body.is-on::after {
-  background: radial-gradient(ellipse 75% 60% at 50% 55%,
-    rgba(255,160,40,0.09) 0%,
-    rgba(220,100,0,0.05) 40%,
-    transparent 72%);
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 55% at 50% 20%,
+    rgba(255, 160, 40, 0) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    background var(--on-duration) var(--easing-on),
+    opacity var(--on-duration) var(--easing-on);
 }
 
-/* Shadow hangat di bawah lampu */
+body.is-on::after {
+  background: radial-gradient(ellipse 70% 55% at 50% 25%,
+    rgba(255, 160, 40, 0.08) 0%,
+    rgba(220, 110, 0, 0.04) 40%,
+    transparent 70%
+  );
+}
+
+/* ─── FLICKER ANIMATION (subtle, saat pertama nyala) ─────── */
+@keyframes filamentFlicker {
+  0%   { opacity: 1; }
+  8%   { opacity: 0.85; }
+  10%  { opacity: 1; }
+  18%  { opacity: 0.92; }
+  20%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+.filament-flicker {
+  animation: filamentFlicker 0.4s ease-out forwards;
+}
+
+/* ─── WARM SHADOW / SOFT SHADOW ──────────────────────────── */
+/* Shadow hangat dari objek di bawah lampu */
 .scene::after {
   content: '';
   position: absolute;
-  bottom: -50px; left: 50%;
+  bottom: -40px;
+  left: 50%;
   transform: translateX(-50%);
-  width: 160px; height: 28px;
+  width: 180px;
+  height: 30px;
   border-radius: 50%;
-  background: rgba(180,100,0,0);
-  filter: blur(18px);
+  background: rgba(180, 100, 0, 0);
+  filter: blur(20px);
   pointer-events: none;
-  transition: background var(--on-duration) var(--ease-on),
-              width var(--on-duration) var(--ease-on);
-}
-.scene.is-on::after {
-  background: rgba(200,110,0,0.28);
-  width: 300px;
+  transition:
+    background var(--on-duration) var(--easing-on),
+    width var(--on-duration) var(--easing-on);
 }
 
-/* ══════════════════════════════════════════════
-   RESPONSIVE MOBILE
-══════════════════════════════════════════════ */
+.scene.is-on::after {
+  background: rgba(180, 100, 0, 0.25);
+  width: 280px;
+}
+
+/* ─── RESPONSIVE MOBILE ──────────────────────────────────── */
 @media (max-width: 480px) {
-  :root { --bulb-w: 180px; }
-  .wire-top { height: 50px; }
-  .socket-body { width: 52px; }
-  .socket-cap { width: 32px; }
-  .socket-base { width: 52px; }
-  .socket-barrel { height: 28px; }
-  .switch-zone { margin-top: 24px; }
+  :root {
+    --bulb-size-desktop: 200px;
+    --bulb-size-mobile:  200px;
+  }
+
+  .bulb-wrapper {
+    width: var(--bulb-size-mobile);
+    height: calc(var(--bulb-size-mobile) * 1.31);
+  }
+
+  .wire {
+    height: 40px;
+  }
+
+  .socket {
+    width: 46px;
+  }
+
+  .socket-body {
+    height: 26px;
+  }
+
+  .switch-container {
+    margin-top: 20px;
+  }
+
+  .hint-text {
+    font-size: 0.6rem;
+  }
+}
+
+/* ─── PERF: GPU layer hints untuk animasi kritis ─────────── */
+.bloom-layer,
+.toggle-thumb,
+#litGlass {
+  will-change: opacity, transform;
+}
+
+#glowCanvas {
+  will-change: contents;
 }
