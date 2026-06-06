@@ -1,495 +1,444 @@
 /**
- * SCRIPT.JS — Edison Bulb v2
+ * SCRIPT.JS — Edison Bulb Interactive
  * ════════════════════════════════════════════════════════════
- * - Canvas glow engine (5 layer ray tracing simulasi)
- * - Particle system: debu melayang saat lampu ON
- * - Web Audio API: suara klik saklar realistis
- * - rAF 60fps, delta time, performa mobile aman
+ * Sistem pencahayaan real-time menggunakan Canvas API.
+ * Mensimulasikan:
+ *  - Volumetric glow (beberapa radial gradient berlapis)
+ *  - Global illumination palsu (ambient room light)
+ *  - Bloom effect dengan gaussian blur via komposit layer
+ *  - Warm shadow pada background
+ *  - Ray tracing simulasi via gradient cone rays
  * ════════════════════════════════════════════════════════════
  */
+
 'use strict';
 
-/* ── CONFIG ─────────────────────────────────────────────── */
-const CFG = {
-  ON_DUR:  300,
-  OFF_DUR: 500,
+/* ──────────────────────────────────────────────────────────
+   KONSTANTA & KONFIGURASI
+────────────────────────────────────────────────────────── */
+const CONFIG = {
+  /* Durasi transisi (ms) — cocok dengan CSS */
+  ON_DURATION:  300,
+  OFF_DURATION: 500,
 
-  FILAMENT_OFF:  { r:50,  g:28,  b:0   },
-  FILAMENT_WARM: { r:255, g:140, b:0   },
-  FILAMENT_HOT:  { r:255, g:210, b:60  },
+  /* Target FPS */
+  TARGET_FPS: 60,
 
+  /* Warna filamen dalam berbagai keadaan */
+  FILAMENT_OFF:  { r: 58,  g: 34,  b: 0   },
+  FILAMENT_WARM: { r: 255, g: 149, b: 0   },
+  FILAMENT_HOT:  { r: 255, g: 204, b: 68  },
+
+  /* Intensitas glow maksimum (0-1) per layer */
   GLOW_LAYERS: [
-    { radius:0.07, alpha:0.75, color:[255,230,110] },
-    { radius:0.16, alpha:0.42, color:[255,185,40]  },
-    { radius:0.32, alpha:0.22, color:[255,130,0]   },
-    { radius:0.54, alpha:0.10, color:[220,85,0]    },
-    { radius:0.82, alpha:0.05, color:[180,55,0]    },
+    { radius: 0.08, alpha: 0.70, color: [255, 220, 100] },   // inti panas
+    { radius: 0.18, alpha: 0.40, color: [255, 180, 40]  },   // halo dekat
+    { radius: 0.35, alpha: 0.20, color: [255, 130, 0]   },   // bloom medium
+    { radius: 0.55, alpha: 0.10, color: [220, 90,  0]   },   // scatter luar
+    { radius: 0.80, alpha: 0.05, color: [180, 60,  0]   },   // ambient room
   ],
 
+  /* Sinar cahaya (ray tracing simulasi) */
   RAYS: [
-    { angle:90,  spread:40, alpha:0.07 },   // lurus ke bawah (dome ke bawah)
-    { angle:75,  spread:22, alpha:0.045 },
-    { angle:105, spread:22, alpha:0.045 },
-    { angle:60,  spread:16, alpha:0.028 },
-    { angle:120, spread:16, alpha:0.028 },
-  ],
-
-  /* Partikel debu */
-  PARTICLE_COUNT: 55,
-  PARTICLE_COLORS: [
-    [255,220,100], [255,190,60], [255,150,30], [220,130,0], [255,240,160]
+    { angle: -90,  spread: 35, alpha: 0.06 },   // lurus ke atas
+    { angle: -75,  spread: 20, alpha: 0.04 },
+    { angle: -105, spread: 20, alpha: 0.04 },
+    { angle: -60,  spread: 15, alpha: 0.025 },
+    { angle: -120, spread: 15, alpha: 0.025 },
   ],
 };
 
-/* ── STATE ──────────────────────────────────────────────── */
-const S = {
+/* ──────────────────────────────────────────────────────────
+   STATE
+────────────────────────────────────────────────────────── */
+const state = {
   isOn: false,
-  intensity: 0,
-  flicker: false,
-  flickerPhase: 0,
-  lastTs: 0,
-  rafId: null,
-  particles: [],
-  audioCtx: null,
+  intensity: 0,        // 0.0 (mati) → 1.0 (penuh)
+  flickerPhase: 0,     // untuk efek flicker awal
+  flickerActive: false,
+  lastTimestamp: 0,
+  animFrameId: null,
 };
 
-/* ── DOM ────────────────────────────────────────────────── */
-const glowCanvas     = document.getElementById('glowCanvas');
-const gCtx           = glowCanvas.getContext('2d');
-const partCanvas     = document.getElementById('particleCanvas');
-const pCtx           = partCanvas.getContext('2d');
-const toggleBtn      = document.getElementById('toggleSwitch');
-const switchLabel    = document.getElementById('switchLabel');
-const scene          = document.querySelector('.scene');
-const bulbWrapper    = document.querySelector('.bulb-wrapper');
-const filamentWires  = document.querySelectorAll('.filament-wire');
-const litGlass       = document.getElementById('litGlass');
-const bloomLayer     = document.getElementById('bloomLayer');
-const bloomOuter     = document.getElementById('bloomLayerOuter');
+/* ──────────────────────────────────────────────────────────
+   DOM REFERENCES
+────────────────────────────────────────────────────────── */
+const canvas        = document.getElementById('glowCanvas');
+const ctx           = canvas.getContext('2d');
+const toggleBtn     = document.getElementById('toggleSwitch');
+const switchLabel   = document.getElementById('switchLabel');
+const scene         = document.querySelector('.scene');
+const bulbWrapper   = document.querySelector('.bulb-wrapper');
+const filamentWires = document.querySelectorAll('.filament-wire');
+const litGlass      = document.getElementById('litGlass');
+const bloomLayer    = document.getElementById('bloomLayer');
+const bloomOuter    = document.getElementById('bloomLayerOuter');
 
-/* ── RESIZE ─────────────────────────────────────────────── */
-function resize() {
-  glowCanvas.width  = partCanvas.width  = window.innerWidth;
-  glowCanvas.height = partCanvas.height = window.innerHeight;
+/* ──────────────────────────────────────────────────────────
+   CANVAS RESIZE — responsif, selalu pas viewport
+────────────────────────────────────────────────────────── */
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
-window.addEventListener('resize', resize);
-resize();
 
-/* ── HELPERS ────────────────────────────────────────────── */
-const lerp  = (a,b,t) => a + (b-a)*t;
-const clamp = (v,lo,hi) => Math.min(Math.max(v,lo),hi);
-const rand  = (lo,hi) => lo + Math.random()*(hi-lo);
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-/* ── POSISI BOHLAM ──────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────
+   HELPER: Posisi pusat bohlam dalam koordinat halaman
+────────────────────────────────────────────────────────── */
 function getBulbCenter() {
-  const r = bulbWrapper.getBoundingClientRect();
+  const rect = bulbWrapper.getBoundingClientRect();
   return {
-    x: r.left + r.width  * 0.5,
-    // Bohlam diflip scaleY(-1): dome di bawah, jadi pusat cahaya di bawah wrapper
-    y: r.top  + r.height * 0.72,
-    radius: Math.min(r.width, r.height) * 0.42,
+    x: rect.left + rect.width  * 0.5,
+    y: rect.top  + rect.height * 0.40,   // sedikit di atas tengah (di area filamen)
+    r: Math.max(rect.width, rect.height) * 0.5,
   };
 }
 
-/* ══════════════════════════════════════════════════════════
-   AUDIO ENGINE — suara klik saklar via Web Audio API
-══════════════════════════════════════════════════════════ */
-function initAudio() {
-  if (S.audioCtx) return;
-  try {
-    S.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  } catch(e) {
-    console.warn('AudioContext tidak didukung:', e);
-  }
-}
+/* ──────────────────────────────────────────────────────────
+   HELPER: Lerp & clamp
+────────────────────────────────────────────────────────── */
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+function easeIn(t) { return t * t * t; }
+function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
-/**
- * Suara klik saklar vintage: noise burst + mechanical thud
- * @param {boolean} turningOn
- */
-function playClickSound(turningOn) {
-  if (!S.audioCtx) return;
-  const ac  = S.audioCtx;
-  const now = ac.currentTime;
+/* ──────────────────────────────────────────────────────────
+   CANVAS RENDER — core rendering loop
+────────────────────────────────────────────────────────── */
+function renderGlow(intensity, flicker) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const { x, y, r } = getBulbCenter();
 
-  /* ── 1. Noise burst (suara "klik" fisik) ── */
-  const bufLen = ac.sampleRate * 0.04;
-  const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
-  const data   = buf.getChannelData(0);
-  for (let i = 0; i < bufLen; i++) {
-    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/bufLen, 3);
-  }
-  const noise = ac.createBufferSource();
-  noise.buffer = buf;
+  /* Bersihkan canvas setiap frame */
+  ctx.clearRect(0, 0, w, h);
 
-  /* Bandpass filter: karakter "klik" mekanikal */
-  const bp = ac.createBiquadFilter();
-  bp.type      = 'bandpass';
-  bp.frequency.value = 1800;
-  bp.Q.value   = 1.2;
+  if (intensity < 0.001) return; /* skip jika hampir mati */
 
-  const gainNoise = ac.createGain();
-  gainNoise.gain.setValueAtTime(0.7, now);
-  gainNoise.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+  /* ── intensitas efektif dengan flicker kecil ── */
+  const effIntensity = intensity * (1 - flicker * 0.08);
 
-  noise.connect(bp);
-  bp.connect(gainNoise);
-  gainNoise.connect(ac.destination);
-  noise.start(now);
-  noise.stop(now + 0.05);
+  /* ── 1. RAY SIMULATION (volumetric light beams) ──────── */
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
 
-  /* ── 2. Thud rendah (bodi saklar) ── */
-  const osc = ac.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(90, now);
-  osc.frequency.exponentialRampToValueAtTime(30, now + 0.06);
+  CONFIG.RAYS.forEach(ray => {
+    const angleRad  = (ray.angle * Math.PI) / 180;
+    const spreadRad = (ray.spread * Math.PI) / 180;
+    const rayLen    = h * 0.9;
 
-  const gainThud = ac.createGain();
-  gainThud.gain.setValueAtTime(0.4, now);
-  gainThud.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    /* Titik ujung sinar (dari pusat bohlam ke atas) */
+    const tipX = x + Math.cos(angleRad) * r * 0.3;
+    const tipY = y + Math.sin(angleRad) * r * 0.3;
 
-  osc.connect(gainThud);
-  gainThud.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + 0.08);
+    /* Buat sinar sebagai cone gradient */
+    const grad = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, rayLen);
+    const a = ray.alpha * effIntensity;
+    grad.addColorStop(0,    `rgba(255, 200, 80, ${a})`);
+    grad.addColorStop(0.15, `rgba(255, 160, 40, ${a * 0.7})`);
+    grad.addColorStop(0.40, `rgba(230, 110, 0,  ${a * 0.3})`);
+    grad.addColorStop(1,    `rgba(200, 80,  0,  0)`);
 
-  /* ── 3. Jika ON: suara relay listrik "bzzt" singkat ── */
-  if (turningOn) {
-    const relayBuf  = ac.createBuffer(1, ac.sampleRate*0.06, ac.sampleRate);
-    const relayData = relayBuf.getChannelData(0);
-    for (let i = 0; i < relayData.length; i++) {
-      // 120Hz buzz (frekuensi PLN)
-      relayData[i] = Math.sin(2*Math.PI*120*i/ac.sampleRate)
-                   * (Math.random()*0.3+0.7)
-                   * Math.pow(1 - i/relayData.length, 1.5) * 0.25;
-    }
-    const relay     = ac.createBufferSource();
-    relay.buffer    = relayBuf;
-    const relayGain = ac.createGain();
-    relayGain.gain.setValueAtTime(0.35, now+0.03);
-    relayGain.gain.exponentialRampToValueAtTime(0.001, now+0.10);
-    relay.connect(relayGain);
-    relayGain.connect(ac.destination);
-    relay.start(now + 0.02);
-    relay.stop(now  + 0.12);
-  }
-}
-
-/* ══════════════════════════════════════════════════════════
-   PARTICLE SYSTEM — debu melayang saat lampu ON
-══════════════════════════════════════════════════════════ */
-function createParticle(cx, cy) {
-  const col = CFG.PARTICLE_COLORS[Math.floor(Math.random()*CFG.PARTICLE_COLORS.length)];
-  return {
-    x:    cx + rand(-80, 80),
-    y:    cy + rand(-30, 60),
-    vx:   rand(-0.4, 0.4),
-    vy:   rand(-0.8, -0.15),      // naik ke atas (melayang dari cahaya)
-    size: rand(0.8, 2.8),
-    alpha: rand(0.15, 0.55),
-    alphaDecay: rand(0.001, 0.003),
-    color: col,
-    life:  1.0,
-    maxLife: rand(3.0, 8.0),      // detik semu
-    wobble: rand(0, Math.PI*2),
-    wobbleSpeed: rand(0.8, 1.8),
-  };
-}
-
-function spawnParticles(cx, cy, count) {
-  for (let i = 0; i < count; i++) {
-    S.particles.push(createParticle(cx, cy));
-  }
-}
-
-function updateParticles(dt, cx, cy, intensity) {
-  /* Spawn partikel baru saat lampu menyala */
-  if (intensity > 0.3 && S.isOn) {
-    const spawnChance = intensity * 0.4 * dt;
-    if (Math.random() < spawnChance && S.particles.length < CFG.PARTICLE_COUNT) {
-      S.particles.push(createParticle(cx, cy));
-    }
-  }
-
-  pCtx.clearRect(0, 0, partCanvas.width, partCanvas.height);
-
-  for (let i = S.particles.length - 1; i >= 0; i--) {
-    const p = S.particles[i];
-
-    /* Update posisi */
-    p.wobble += p.wobbleSpeed * dt * 0.05;
-    p.x  += p.vx + Math.sin(p.wobble) * 0.3;
-    p.y  += p.vy;
-    p.vy += -0.002; /* buoyancy: makin ringan naik */
-    p.alpha -= p.alphaDecay;
-    p.life  -= dt * 0.004;
-
-    /* Fade saat lampu mati */
-    if (!S.isOn) p.alpha -= 0.008;
-
-    if (p.alpha <= 0 || p.life <= 0) {
-      S.particles.splice(i, 1);
-      continue;
-    }
-
-    /* Gambar partikel */
-    const effAlpha = p.alpha * intensity;
-    if (effAlpha < 0.01) continue;
-
-    const [r,g,b] = p.color;
-    pCtx.save();
-    pCtx.globalAlpha = effAlpha;
-    pCtx.shadowColor = `rgb(${r},${g},${b})`;
-    pCtx.shadowBlur  = p.size * 4;
-    pCtx.fillStyle   = `rgb(${r},${g},${b})`;
-    pCtx.beginPath();
-    pCtx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-    pCtx.fill();
-    pCtx.restore();
-  }
-}
-
-/* ══════════════════════════════════════════════════════════
-   GLOW CANVAS RENDER
-══════════════════════════════════════════════════════════ */
-function renderGlow(intensity) {
-  const w = glowCanvas.width;
-  const h = glowCanvas.height;
-  const { x, y, radius } = getBulbCenter();
-
-  gCtx.clearRect(0, 0, w, h);
-  if (intensity < 0.002) return;
-
-  const eff = intensity;
-
-  /* ── Ray beams ke bawah (dome menghadap bawah) ── */
-  gCtx.save();
-  gCtx.globalCompositeOperation = 'screen';
-  CFG.RAYS.forEach(ray => {
-    const aRad  = (ray.angle * Math.PI) / 180;
-    const sRad  = (ray.spread * Math.PI) / 180;
-    const len   = h * 0.92;
-    const tx    = x + Math.cos(aRad) * radius * 0.25;
-    const ty    = y + Math.sin(aRad) * radius * 0.25;
-    const alpha = ray.alpha * eff;
-
-    const g = gCtx.createRadialGradient(tx, ty, 0, tx, ty, len);
-    g.addColorStop(0,    `rgba(255,210,80,${alpha})`);
-    g.addColorStop(0.18, `rgba(255,165,35,${(alpha*0.65).toFixed(3)})`);
-    g.addColorStop(0.45, `rgba(230,105,0,${(alpha*0.28).toFixed(3)})`);
-    g.addColorStop(1,    `rgba(200,70,0,0)`);
-
-    gCtx.beginPath();
-    gCtx.moveTo(tx, ty);
-    gCtx.arc(tx, ty, len, aRad - sRad/2, aRad + sRad/2);
-    gCtx.closePath();
-    gCtx.fillStyle = g;
-    gCtx.fill();
+    ctx.beginPath();
+    /* Cone: arc dari sudut-spread/2 ke sudut+spread/2 */
+    ctx.moveTo(tipX, tipY);
+    ctx.arc(tipX, tipY, rayLen,
+      angleRad - spreadRad / 2,
+      angleRad + spreadRad / 2
+    );
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
   });
-  gCtx.restore();
 
-  /* ── Multi-layer radial glow ── */
-  gCtx.save();
-  gCtx.globalCompositeOperation = 'screen';
-  CFG.GLOW_LAYERS.forEach(layer => {
-    const r  = layer.radius * Math.max(w, h);
-    const a  = layer.alpha  * eff;
-    const [cr,cg,cb] = layer.color;
-    const g  = gCtx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0,    `rgba(${cr},${cg},${cb},${a})`);
-    g.addColorStop(0.38, `rgba(${cr},${cg},${cb},${(a*0.48).toFixed(3)})`);
-    g.addColorStop(0.72, `rgba(${cr},${cg},${cb},${(a*0.14).toFixed(3)})`);
-    g.addColorStop(1,    `rgba(${cr},${cg},${cb},0)`);
-    gCtx.beginPath();
-    gCtx.arc(x, y, r, 0, Math.PI*2);
-    gCtx.fillStyle = g;
-    gCtx.fill();
+  ctx.restore();
+
+  /* ── 2. RADIAL GLOW LAYERS (multi-pass) ──────────────── */
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  CONFIG.GLOW_LAYERS.forEach(layer => {
+    const radius = layer.radius * Math.max(w, h);
+    const alpha  = layer.alpha  * effIntensity;
+    const [cr, cg, cb] = layer.color;
+
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    grad.addColorStop(0,    `rgba(${cr}, ${cg}, ${cb}, ${alpha})`);
+    grad.addColorStop(0.4,  `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.5})`);
+    grad.addColorStop(0.75, `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.15})`);
+    grad.addColorStop(1,    `rgba(${cr}, ${cg}, ${cb}, 0)`);
+
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
   });
-  gCtx.restore();
 
-  /* ── Bloom corona (terdekat bohlam) ── */
-  gCtx.save();
-  gCtx.globalCompositeOperation = 'screen';
-  gCtx.filter = 'blur(7px)';
-  const cR  = radius * (1.35 + 0.35*eff);
-  const ca  = 0.60 * eff;
-  const cg  = gCtx.createRadialGradient(x, y, radius*0.18, x, y, cR);
-  cg.addColorStop(0,   `rgba(255,245,170,${ca})`);
-  cg.addColorStop(0.28,`rgba(255,185,45,${(ca*0.58).toFixed(3)})`);
-  cg.addColorStop(0.65,`rgba(255,105,0,${(ca*0.20).toFixed(3)})`);
-  cg.addColorStop(1,   `rgba(200,60,0,0)`);
-  gCtx.beginPath();
-  gCtx.arc(x, y, cR, 0, Math.PI*2);
-  gCtx.fillStyle = cg;
-  gCtx.fill();
-  gCtx.filter = 'none';
-  gCtx.restore();
+  ctx.restore();
 
-  /* ── Global illumination: lantai & dinding ── */
-  gCtx.save();
-  gCtx.globalCompositeOperation = 'screen';
-  // lantai (cahaya ke bawah)
-  const flG = gCtx.createRadialGradient(x, h, 0, x, h, w*0.85);
-  flG.addColorStop(0,  `rgba(255,145,30,${(0.038*eff).toFixed(3)})`);
-  flG.addColorStop(0.5,`rgba(200,80,0,${(0.015*eff).toFixed(3)})`);
-  flG.addColorStop(1,  `rgba(0,0,0,0)`);
-  gCtx.fillStyle = flG;
-  gCtx.fillRect(0, h*0.45, w, h*0.55);
-  gCtx.restore();
+  /* ── 3. BLOOM CORONA (cahaya sangat dekat bohlam) ─────── */
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.filter = 'blur(8px)';
 
-  /* ── Warm edge shadow ── */
-  gCtx.save();
-  gCtx.globalCompositeOperation = 'multiply';
-  const sdG = gCtx.createRadialGradient(x, y, radius*1.6, x, y, Math.max(w,h)*0.88);
-  sdG.addColorStop(0,  `rgba(0,0,0,0)`);
-  sdG.addColorStop(0.7,`rgba(0,0,0,${(0.15*eff).toFixed(3)})`);
-  sdG.addColorStop(1,  `rgba(0,0,0,${(0.35*eff).toFixed(3)})`);
-  gCtx.fillStyle = sdG;
-  gCtx.fillRect(0, 0, w, h);
-  gCtx.restore();
+  const coronaR = r * 1.4 * effIntensity + r * 0.8;
+  const corona  = ctx.createRadialGradient(x, y, r * 0.2, x, y, coronaR);
+  const ca = 0.55 * effIntensity;
+  corona.addColorStop(0,   `rgba(255, 240, 160, ${ca})`);
+  corona.addColorStop(0.3, `rgba(255, 180, 40,  ${ca * 0.6})`);
+  corona.addColorStop(0.7, `rgba(255, 100, 0,   ${ca * 0.2})`);
+  corona.addColorStop(1,   `rgba(200, 60,  0,   0)`);
+
+  ctx.beginPath();
+  ctx.arc(x, y, coronaR, 0, Math.PI * 2);
+  ctx.fillStyle = corona;
+  ctx.fill();
+
+  ctx.filter = 'none';
+  ctx.restore();
+
+  /* ── 4. GLOBAL ILLUMINATION — lantai dan dinding ─────── */
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  /* Pantulan ke dinding atas */
+  const wallGrad = ctx.createLinearGradient(x, 0, x, h * 0.5);
+  const wa = 0.04 * effIntensity;
+  wallGrad.addColorStop(0,   `rgba(255, 160, 40, 0)`);
+  wallGrad.addColorStop(0.5, `rgba(255, 120, 20, ${wa})`);
+  wallGrad.addColorStop(1,   `rgba(200, 80,  0,  0)`);
+
+  ctx.fillStyle = wallGrad;
+  ctx.fillRect(0, 0, w, h * 0.5);
+
+  /* Pantulan ke lantai / bawah */
+  const floorGrad = ctx.createRadialGradient(x, h, 0, x, h, w * 0.8);
+  const fa = 0.03 * effIntensity;
+  floorGrad.addColorStop(0,   `rgba(255, 140, 30, ${fa})`);
+  floorGrad.addColorStop(0.5, `rgba(200, 80,  0,  ${fa * 0.4})`);
+  floorGrad.addColorStop(1,   `rgba(0, 0, 0,      0)`);
+
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0, h * 0.5, w, h * 0.5);
+
+  ctx.restore();
+
+  /* ── 5. SOFT WARM SHADOW — bayangan hangat di belakang ── */
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+
+  /* Area shadow "menghitam" sedikit di tepi jauh */
+  const shadowGrad = ctx.createRadialGradient(x, y, r * 1.5, x, y, Math.max(w, h) * 0.8);
+  const sa = 0.25 * effIntensity;
+  shadowGrad.addColorStop(0,   `rgba(0, 0, 0, 0)`);
+  shadowGrad.addColorStop(0.5, `rgba(0, 0, 0, 0)`);
+  shadowGrad.addColorStop(0.8, `rgba(0, 0, 0, ${sa * 0.3})`);
+  shadowGrad.addColorStop(1,   `rgba(0, 0, 0, ${sa})`);
+
+  ctx.fillStyle = shadowGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.restore();
 }
 
-/* ══════════════════════════════════════════════════════════
-   FILAMEN COLOR UPDATE
-══════════════════════════════════════════════════════════ */
-function updateFilament(intensity) {
-  const off  = CFG.FILAMENT_OFF;
-  const warm = CFG.FILAMENT_WARM;
-  const hot  = CFG.FILAMENT_HOT;
+/* ──────────────────────────────────────────────────────────
+   UPDATE FILAMEN — interpolasi warna berdasarkan intensitas
+────────────────────────────────────────────────────────── */
+function updateFilamentColor(intensity) {
+  const off  = CONFIG.FILAMENT_OFF;
+  const warm = CONFIG.FILAMENT_WARM;
+  const hot  = CONFIG.FILAMENT_HOT;
 
   let r, g, b;
+
   if (intensity < 0.5) {
+    /* OFF → WARM */
     const t = intensity * 2;
     r = Math.round(lerp(off.r, warm.r, t));
     g = Math.round(lerp(off.g, warm.g, t));
     b = Math.round(lerp(off.b, warm.b, t));
   } else {
+    /* WARM → HOT */
     const t = (intensity - 0.5) * 2;
     r = Math.round(lerp(warm.r, hot.r, t));
     g = Math.round(lerp(warm.g, hot.g, t));
     b = Math.round(lerp(warm.b, hot.b, t));
   }
 
-  const col  = `rgb(${r},${g},${b})`;
-  const a    = intensity.toFixed(3);
+  const color     = `rgb(${r}, ${g}, ${b})`;
+  const glowAlpha = intensity.toFixed(3);
 
-  filamentWires.forEach(w => {
-    w.style.stroke = col;
-    if (intensity > 0.02) {
-      const g1 = (intensity*5).toFixed(1);
-      const g2 = (intensity*12).toFixed(1);
-      const g3 = (intensity*24).toFixed(1);
-      w.style.filter =
-        `drop-shadow(0 0 ${g1}px rgba(255,210,60,${a})) `+
-        `drop-shadow(0 0 ${g2}px rgba(255,150,0,${(intensity*0.7).toFixed(3)})) `+
-        `drop-shadow(0 0 ${g3}px rgba(255,90,0,${(intensity*0.38).toFixed(3)}))`;
+  /* Terapkan ke setiap elemen filamen */
+  filamentWires.forEach(wire => {
+    wire.style.stroke = color;
+    if (intensity > 0.01) {
+      /* Glow makin kuat seiring intensitas */
+      const g1 = (intensity * 4).toFixed(2);
+      const g2 = (intensity * 10).toFixed(2);
+      const g3 = (intensity * 20).toFixed(2);
+      wire.style.filter =
+        `drop-shadow(0 0 ${g1}px rgba(255,204,68,${glowAlpha})) ` +
+        `drop-shadow(0 0 ${g2}px rgba(255,153,0,${(glowAlpha*0.7).toFixed(3)})) ` +
+        `drop-shadow(0 0 ${g3}px rgba(255,100,0,${(glowAlpha*0.4).toFixed(3)}))`;
     } else {
-      w.style.filter = 'none';
+      wire.style.filter = 'none';
     }
   });
 
-  litGlass.style.opacity = (intensity * 0.38).toFixed(3);
+  /* Update opacity kaca panas */
+  litGlass.style.opacity = (intensity * 0.35).toFixed(3);
 }
 
-/* ══════════════════════════════════════════════════════════
-   BLOOM CSS UPDATE
-══════════════════════════════════════════════════════════ */
-function updateBloom(intensity) {
-  bloomLayer.style.opacity = intensity.toFixed(3);
-  bloomOuter.style.opacity = (intensity * 0.85).toFixed(3);
-  const sc = 1 + intensity * 0.18;
-  bloomLayer.style.transform = `translateX(-50%) scale(${sc.toFixed(3)})`;
-  bloomOuter.style.transform = `translateX(-50%) scale(${(sc*1.12).toFixed(3)})`;
+/* ──────────────────────────────────────────────────────────
+   UPDATE BLOOM CSS — sinkron dengan intensitas Canvas
+────────────────────────────────────────────────────────── */
+function updateBloomCSS(intensity) {
+  const op1 = (intensity * 1.0).toFixed(3);
+  const op2 = (intensity * 0.8).toFixed(3);
+  bloomLayer.style.opacity  = op1;
+  bloomOuter.style.opacity  = op2;
+
+  /* Scale sedikit membesar saat intensitas penuh */
+  const scale = 1 + intensity * 0.15;
+  bloomLayer.style.transform  = `translateX(-50%) scale(${scale.toFixed(3)})`;
+  bloomOuter.style.transform  = `translateX(-50%) scale(${(scale * 1.1).toFixed(3)})`;
 }
 
-/* ══════════════════════════════════════════════════════════
-   MAIN LOOP — requestAnimationFrame
-══════════════════════════════════════════════════════════ */
-function loop(ts) {
-  const dt  = Math.min(ts - (S.lastTs || ts), 50);
-  S.lastTs  = ts;
+/* ──────────────────────────────────────────────────────────
+   MAIN ANIMATION LOOP — requestAnimationFrame 60fps
+────────────────────────────────────────────────────────── */
+function animate(timestamp) {
+  /* Delta time dalam ms, cap di 50ms untuk mencegah jump besar */
+  const dt = Math.min(timestamp - (state.lastTimestamp || timestamp), 50);
+  state.lastTimestamp = timestamp;
 
-  /* Intensity ramp */
-  const dur   = S.isOn ? CFG.ON_DUR : CFG.OFF_DUR;
-  const delta = dt / dur;
-  S.intensity = S.isOn
-    ? clamp(S.intensity + delta, 0, 1)
-    : clamp(S.intensity - delta, 0, 1);
+  /* Hitung laju perubahan intensitas berdasarkan state */
+  const duration = state.isOn ? CONFIG.ON_DURATION : CONFIG.OFF_DURATION;
+  const delta    = (dt / duration);
 
-  /* Flicker saat baru menyala */
-  let flicker = 0;
-  if (S.flicker) {
-    S.flickerPhase += dt * 0.055;
-    flicker = Math.sin(S.flickerPhase * 7.8) * 0.5 + 0.5;
-    if (S.flickerPhase > 10) { S.flicker = false; S.flickerPhase = 0; }
-  }
-  const eff = S.intensity * (1 - flicker * 0.09);
-
-  renderGlow(eff);
-
-  const { x, y } = getBulbCenter();
-  updateParticles(dt, x, y, eff);
-  updateFilament(eff);
-  updateBloom(eff);
-
-  /* Sync body class */
-  if (S.isOn) {
-    scene.classList.add('is-on');
-    document.body.classList.add('is-on');
-  } else if (S.intensity < 0.01) {
-    scene.classList.remove('is-on');
-    document.body.classList.remove('is-on');
-  }
-
-  const still =
-    (S.isOn && S.intensity < 1) ||
-    (!S.isOn && S.intensity > 0) ||
-    S.flicker ||
-    S.particles.length > 0;
-
-  S.rafId = still ? requestAnimationFrame(loop) : null;
-}
-
-function startLoop() {
-  if (S.rafId) return;
-  S.lastTs = performance.now();
-  S.rafId  = requestAnimationFrame(loop);
-}
-
-/* ══════════════════════════════════════════════════════════
-   TOGGLE
-══════════════════════════════════════════════════════════ */
-function toggle() {
-  initAudio();
-  S.isOn = !S.isOn;
-
-  playClickSound(S.isOn);
-
-  toggleBtn.setAttribute('aria-checked', S.isOn ? 'true' : 'false');
-  switchLabel.textContent = S.isOn ? 'ON' : 'OFF';
-
-  if (S.isOn) {
-    S.flicker = true;
-    S.flickerPhase = 0;
-    scene.classList.add('is-on');
-    document.body.classList.add('is-on');
-
-    /* Burst partikel awal saat nyala */
-    const { x, y } = getBulbCenter();
-    spawnParticles(x, y, 18);
+  if (state.isOn) {
+    state.intensity = clamp(state.intensity + delta, 0, 1);
   } else {
-    /* Partikel akan fade sendiri karena intensity turun */
+    state.intensity = clamp(state.intensity - delta, 0, 1);
   }
 
-  startLoop();
+  /* Efek flicker kecil (hanya saat baru menyala) */
+  let flickerValue = 0;
+  if (state.flickerActive) {
+    state.flickerPhase += dt * 0.05;
+    flickerValue = Math.sin(state.flickerPhase * 7.3) * 0.5 + 0.5;
+    /* Matikan flicker setelah phase tertentu */
+    if (state.flickerPhase > 12) {
+      state.flickerActive = false;
+      state.flickerPhase  = 0;
+    }
+  }
+
+  /* Render canvas dengan intensitas saat ini */
+  renderGlow(state.intensity, flickerValue);
+
+  /* Update warna filamen */
+  updateFilamentColor(state.intensity);
+
+  /* Update bloom CSS */
+  updateBloomCSS(state.intensity);
+
+  /* Update body class untuk ambient (hanya satu kali saat berubah, tapi perlu sync) */
+  const bodyOn = document.body.classList.contains('is-on');
+  if (state.isOn && !bodyOn) {
+    document.body.classList.add('is-on');
+    scene.classList.add('is-on');
+  } else if (!state.isOn && bodyOn && state.intensity < 0.01) {
+    document.body.classList.remove('is-on');
+    scene.classList.remove('is-on');
+  }
+
+  /* Teruskan loop selama masih berubah */
+  const isChanging =
+    (state.isOn  && state.intensity < 1.0) ||
+    (!state.isOn && state.intensity > 0.0) ||
+    state.flickerActive;
+
+  if (isChanging) {
+    state.animFrameId = requestAnimationFrame(animate);
+  } else {
+    state.animFrameId = null;
+  }
 }
 
-/* ── EVENTS ─────────────────────────────────────────────── */
-toggleBtn.addEventListener('click',   toggle);
-toggleBtn.addEventListener('keydown', e => {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
-});
-bulbWrapper.addEventListener('click', toggle);
+/* ──────────────────────────────────────────────────────────
+   MULAI / HENTIKAN ANIMASI
+────────────────────────────────────────────────────────── */
+function startAnimation() {
+  if (state.animFrameId) return; /* sudah berjalan */
+  state.lastTimestamp = performance.now();
+  state.animFrameId   = requestAnimationFrame(animate);
+}
 
-/* ── INIT ───────────────────────────────────────────────── */
-renderGlow(0);
+/* ──────────────────────────────────────────────────────────
+   TOGGLE LAMPU
+────────────────────────────────────────────────────────── */
+function toggleLight() {
+  state.isOn = !state.isOn;
+
+  /* Update ARIA dan label */
+  toggleBtn.setAttribute('aria-checked', state.isOn ? 'true' : 'false');
+  switchLabel.textContent = state.isOn ? 'ON' : 'OFF';
+
+  if (state.isOn) {
+    /* Aktifkan flicker saat menyala */
+    state.flickerActive = true;
+    state.flickerPhase  = 0;
+
+    /* Tambahkan class segera untuk CSS transition */
+    scene.classList.add('is-on');
+    document.body.classList.add('is-on');
+  } else {
+    /* Hapus class — CSS transition akan berlaku */
+    /* (scene.classList.remove dijalankan di loop saat intensitas mendekati 0) */
+  }
+
+  /* Mulai (atau lanjutkan) animasi */
+  startAnimation();
+}
+
+/* ──────────────────────────────────────────────────────────
+   EVENT LISTENERS
+────────────────────────────────────────────────────────── */
+toggleBtn.addEventListener('click', toggleLight);
+
+/* Keyboard accessibility: Enter / Space */
+toggleBtn.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleLight();
+  }
+});
+
+/* Klik di mana saja pada bohlam juga toggle (UX lebih baik) */
+bulbWrapper.addEventListener('click', toggleLight);
+
+/* ──────────────────────────────────────────────────────────
+   RENDER AWAL — pastikan canvas menggambar (state OFF)
+────────────────────────────────────────────────────────── */
+renderGlow(0, 0);
+
+/* ──────────────────────────────────────────────────────────
+   HINT LABEL FADE SETELAH PERTAMA KALI DIGUNAKAN
+────────────────────────────────────────────────────────── */
+(function setupHint() {
+  const hint = document.querySelector('.hint-text');
+  let used = false;
+  function hideHint() {
+    if (!used) {
+      used = true;
+      hint.style.opacity = '0';
+      setTimeout(() => { hint.style.display = 'none'; }, 600);
+    }
+  }
+  toggleBtn.addEventListener('click', hideHint, { once: true });
+  bulbWrapper.addEventListener('click', hideHint, { once: true });
+})();
