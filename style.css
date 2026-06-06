@@ -183,7 +183,6 @@ body {
   height: 100%;
   overflow: visible;
   /* FLIP: leher di atas, dome di bawah */
-  transform: scaleY(-1);
   position: relative;
   z-index: 2;
 }
