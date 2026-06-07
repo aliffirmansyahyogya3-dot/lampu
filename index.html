@@ -158,46 +158,70 @@
           fill="url(#litGrad)" opacity="0"/>
 
         <!-- ════════════════════════════════
-             INTERNAL STRUCTURE
-        ════════════════════════════════ -->
-        <!-- Glass stem (tiang dari bawah ke filamen) -->
-        <line x1="130" y1="168" x2="130" y2="260"
-          stroke="#d0bc68" stroke-width="2.5" stroke-opacity="0.55"/>
-        <!-- Support wire kiri -->
-        <line x1="130" y1="260" x2="102" y2="290"
-          stroke="#b89840" stroke-width="1.8" stroke-opacity="0.65"/>
-        <!-- Support wire kanan -->
-        <line x1="130" y1="260" x2="158" y2="290"
-          stroke="#b89840" stroke-width="1.8" stroke-opacity="0.65"/>
-
         <!-- ════════════════════════════════
-             FILAMEN (di tengah globe, Y ≈ 290..338)
-        ════════════════════════════════ -->
-        <g id="filamentGroup" filter="url(#filGlow)">
-          <!-- Coil kiri -->
-          <path id="filamentLeft"
-            d="M102,338
-               C99,334 106,330 102,278
-               C98,322 105,318 102,266
-               C98,310 105,306 102,254
-               C99,299 104,296 102,246"
-            stroke="#3e2000" stroke-width="2.6"
-            stroke-linecap="round" fill="none" class="filament-wire"/>
-          <!-- Bridge atas -->
-          <path id="filamentBridge"
-            d="M102,294 C110,289 120,287 130,238 C140,287 150,289 158,246"
-            stroke="#3e2000" stroke-width="2.6"
-            stroke-linecap="round" fill="none" class="filament-wire"/>
-          <!-- Coil kanan -->
-          <path id="filamentRight"
-            d="M158,294
-               C156,296 161,299 158,254
-               C155,306 161,310 158,266
-               C155,318 161,322 158,278
-               C155,330 161,334 158,290"
-            stroke="#3e2000" stroke-width="2.6"
-            stroke-linecap="round" fill="none" class="filament-wire"/>
-        </g>
+     INTERNAL STRUCTURE (FIXED)
+════════════════════════════════ -->
+<!-- Stem turun dari socket -->
+<line x1="130" y1="168" x2="130" y2="260"
+  stroke="#d0bc68"
+  stroke-width="2.5"
+  stroke-opacity="0.55"/>
+
+<!-- Support kiri -->
+<line x1="130" y1="260" x2="102" y2="290"
+  stroke="#b89840"
+  stroke-width="1.8"
+  stroke-opacity="0.65"/>
+
+<!-- Support kanan -->
+<line x1="130" y1="260" x2="158" y2="290"
+  stroke="#b89840"
+  stroke-width="1.8"
+  stroke-opacity="0.65"/>
+
+<!-- ════════════════════════════════
+     FILAMENT (POSISI BARU)
+════════════════════════════════ -->
+<g id="filamentGroup" filter="url(#filGlow)">
+
+  <!-- Coil kiri -->
+  <path id="filamentLeft"
+    d="M102,290
+       C99,286 106,282 102,278
+       C98,274 105,270 102,266
+       C98,262 105,258 102,254
+       C99,251 104,248 102,246"
+    stroke="#3e2000"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    fill="none"
+    class="filament-wire"/>
+
+  <!-- Bridge -->
+  <path id="filamentBridge"
+    d="M102,246
+       C110,241 120,239 130,238
+       C140,239 150,241 158,246"
+    stroke="#3e2000"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    fill="none"
+    class="filament-wire"/>
+
+  <!-- Coil kanan -->
+  <path id="filamentRight"
+    d="M158,246
+       C156,248 161,251 158,254
+       C155,258 161,262 158,266
+       C155,270 161,274 158,278
+       C155,282 161,286 158,290"
+    stroke="#3e2000"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    fill="none"
+    class="filament-wire"/>
+
+</g>
 
         <!-- ════════════════════════════════
              REFLEKSI & GLOSS KACA
