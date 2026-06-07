@@ -1,217 +1,198 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Edison Bulb — Interactive Light</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+  <title>Edison Bulb</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-  <!-- Canvas volumetric glow — dirender di belakang semua elemen -->
   <canvas id="glowCanvas"></canvas>
-
-  <!-- Container partikel debu/percikan saat lampu menyala -->
   <canvas id="particleCanvas"></canvas>
 
   <div class="scene">
 
-    <!-- ══ KABEL dari langit-langit ══ -->
-    <div class="ceiling-wire">
-      <div class="wire-top"></div>
-    </div>
-
-    <!-- ══ SOCKET (tempat lampu) — di atas bohlam ══ -->
-    <div class="socket-assembly">
-      <div class="socket-cap"></div>
-      <div class="socket-body">
-        <div class="socket-ring socket-ring--top"></div>
-        <div class="socket-barrel"></div>
-        <div class="socket-ring socket-ring--bottom"></div>
-      </div>
-      <div class="socket-base"></div>
-    </div>
-
-    <!-- ══ BOHLAM SVG — menghadap ke bawah (globe di bawah) ══ -->
-    <div class="bulb-wrapper">
-      <svg id="bulbSVG"
-           viewBox="0 0 260 320"
-           xmlns="http://www.w3.org/2000/svg"
-           aria-label="Lampu pijar Edison">
+    <!--
+      SATU SVG TUNGGAL: kabel + socket + bohlam — tidak ada gap.
+      viewBox 0 0 260 500.
+      Atas = kabel, tengah = socket, bawah = globe.
+    -->
+    <div class="lamp-wrap">
+      <svg id="mainSVG" viewBox="0 0 260 500" xmlns="http://www.w3.org/2000/svg">
         <defs>
-
-          <!-- Kaca bohlam transparan -->
-          <radialGradient id="glassGrad" cx="35%" cy="30%" r="70%">
-            <stop offset="0%"   stop-color="#fff8ee" stop-opacity="0.22"/>
-            <stop offset="30%"  stop-color="#f0dda0" stop-opacity="0.08"/>
-            <stop offset="70%"  stop-color="#c09040" stop-opacity="0.05"/>
-            <stop offset="100%" stop-color="#805010" stop-opacity="0.12"/>
+          <!-- Kaca transparan -->
+          <radialGradient id="glassGrad" cx="34%" cy="26%" r="68%">
+            <stop offset="0%"   stop-color="#fff9ee" stop-opacity="0.22"/>
+            <stop offset="28%"  stop-color="#f0dea0" stop-opacity="0.08"/>
+            <stop offset="68%"  stop-color="#c09040" stop-opacity="0.04"/>
+            <stop offset="100%" stop-color="#7a5010" stop-opacity="0.12"/>
           </radialGradient>
-
-          <!-- Glow dalam kaca saat menyala -->
-          <radialGradient id="litGlassGrad" cx="50%" cy="42%" r="58%">
-            <stop offset="0%"   stop-color="#ffe090" stop-opacity="0"/>
-            <stop offset="35%"  stop-color="#ffaa20" stop-opacity="0"/>
-            <stop offset="100%" stop-color="#c06000" stop-opacity="0"/>
+          <!-- Kaca panas (lit) -->
+          <radialGradient id="litGlassGrad" cx="50%" cy="50%" r="55%">
+            <stop offset="0%"   stop-color="#ffe898" stop-opacity="0"/>
+            <stop offset="40%"  stop-color="#ffaa20" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#c05800" stop-opacity="0"/>
           </radialGradient>
-
-          <!-- Glossy highlight -->
-          <radialGradient id="glossGrad" cx="28%" cy="25%" r="48%">
-            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.45"/>
-            <stop offset="45%"  stop-color="#ffffff" stop-opacity="0.10"/>
+          <!-- Gloss kaca -->
+          <radialGradient id="glossGrad" cx="26%" cy="20%" r="48%">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.46"/>
+            <stop offset="46%"  stop-color="#ffffff" stop-opacity="0.10"/>
             <stop offset="100%" stop-color="#ffffff" stop-opacity="0.00"/>
           </radialGradient>
-
-          <!-- Leher bohlam logam -->
-          <linearGradient id="neckGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="#6a4a10" stop-opacity="0.9"/>
-            <stop offset="25%"  stop-color="#e8b040" stop-opacity="0.8"/>
-            <stop offset="50%"  stop-color="#f8d060" stop-opacity="0.7"/>
-            <stop offset="75%"  stop-color="#c89030" stop-opacity="0.8"/>
-            <stop offset="100%" stop-color="#5a3a08" stop-opacity="0.9"/>
+          <!-- Logam kuningan -->
+          <linearGradient id="metalGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#2e1c04"/>
+            <stop offset="16%"  stop-color="#8a6014"/>
+            <stop offset="36%"  stop-color="#d8a038"/>
+            <stop offset="50%"  stop-color="#f4cc58"/>
+            <stop offset="64%"  stop-color="#d8a038"/>
+            <stop offset="84%"  stop-color="#8a6014"/>
+            <stop offset="100%" stop-color="#2e1c04"/>
           </linearGradient>
-
-          <!-- Glow filter filamen -->
-          <filter id="filamentGlow" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          <!-- Logam gelap (ring) -->
+          <linearGradient id="metalDark" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#140e02"/>
+            <stop offset="28%"  stop-color="#5a400c"/>
+            <stop offset="50%"  stop-color="#b88828"/>
+            <stop offset="72%"  stop-color="#5a400c"/>
+            <stop offset="100%" stop-color="#140e02"/>
+          </linearGradient>
+          <!-- Filter glow filamen -->
+          <filter id="filGlow" x="-130%" y="-130%" width="360%" height="360%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+            <feComposite in="SourceGraphic" in2="b" operator="over"/>
           </filter>
-
-          <!-- Clip shape bohlam -->
-          <clipPath id="bulbClip">
-            <path d="M130,10 C82,10 46,50 46,98 C46,136 65,162 84,188
-                     C94,202 100,216 100,232 L160,232
-                     C160,216 166,202 176,188 C195,162 214,136 214,98
-                     C214,50 178,10 130,10 Z"/>
-          </clipPath>
         </defs>
 
-        <!-- Badan bohlam utama -->
-        <path id="bulbBody"
-          d="M130,10 C82,10 46,50 46,98 C46,136 65,162 84,188
-             C94,202 100,216 100,232 L160,232
-             C160,216 166,202 176,188 C195,162 214,136 214,98
-             C214,50 178,10 130,10 Z"
-          fill="url(#glassGrad)"
-          stroke="#c8a030" stroke-width="1.3" stroke-opacity="0.4"/>
+        <!-- ══ KABEL Y:0→58 ══ -->
+        <line x1="130" y1="0"  x2="130" y2="60"
+          stroke="#181008" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="131" y1="2"  x2="131" y2="60"
+          stroke="#705020" stroke-width="1" stroke-opacity="0.5" stroke-linecap="round"/>
 
-        <!-- Layer glow kaca saat menyala -->
+        <!-- ══ CAP ATAS SOCKET Y:58→72 ══ -->
+        <!-- Sambungan kabel ke socket: silinder kecil -->
+        <rect x="118" y="58" width="24" height="14" rx="4"
+          fill="url(#metalGrad)"/>
+        <rect x="118" y="69" width="24" height="3" fill="#000" fill-opacity="0.3"/>
+
+        <!-- ══ SOCKET BAREL Y:72→138 ══
+             Lebar simetris 44px (cx=130, half=22) → x:108..152 -->
+        <!-- Ring atas -->
+        <rect x="106" y="72" width="48" height="10" rx="2.5"
+          fill="url(#metalDark)"/>
+        <!-- Barel utama -->
+        <rect x="106" y="82" width="48" height="46" fill="url(#metalGrad)"/>
+        <!-- Ulir -->
+        <line x1="106" y1="89"  x2="154" y2="89"  stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
+        <line x1="106" y1="96"  x2="154" y2="96"  stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
+        <line x1="106" y1="103" x2="154" y2="103" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
+        <line x1="106" y1="110" x2="154" y2="110" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
+        <line x1="106" y1="117" x2="154" y2="117" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
+        <line x1="106" y1="124" x2="154" y2="124" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
+        <!-- Kilap logam vertikal -->
+        <rect x="124" y="82" width="12" height="46" fill="#fff" fill-opacity="0.08"/>
+        <!-- Ring bawah -->
+        <rect x="106" y="128" width="48" height="10" rx="2.5"
+          fill="url(#metalDark)"/>
+
+        <!-- ══ NECK / LEHER Y:138→162 ══
+             Melebar dari 48px (106..154) ke 62px (99..161) -->
+        <path d="M106,138 L99,162 L161,162 L154,138 Z"
+          fill="url(#metalGrad)"/>
+        <!-- Garis batas bawah neck -->
+        <rect x="99" y="160" width="62" height="3"
+          fill="url(#metalDark)" rx="1"/>
+
+        <!-- ══ GLOBE BOHLAM Y:162→450 ══
+             Menyambung tepat di x:99..161 pada Y=162 -->
+        <path id="bulbBody"
+          d="M99,162
+             C56,162 14,202 14,262
+             C14,322 52,368 86,400
+             C100,414 108,430 108,446
+             L152,446
+             C152,430 160,414 174,400
+             C208,368 246,322 246,262
+             C246,202 204,162 161,162 Z"
+          fill="url(#glassGrad)"
+          stroke="#c09828" stroke-width="1.3" stroke-opacity="0.40"/>
+
+        <!-- Kaca panas (lit) — dikontrol JS -->
         <path id="litGlass"
-          d="M130,10 C82,10 46,50 46,98 C46,136 65,162 84,188
-             C94,202 100,216 100,232 L160,232
-             C160,216 166,202 176,188 C195,162 214,136 214,98
-             C214,50 178,10 130,10 Z"
+          d="M99,162
+             C56,162 14,202 14,262
+             C14,322 52,368 86,400
+             C100,414 108,430 108,446
+             L152,446
+             C152,430 160,414 174,400
+             C208,368 246,322 246,262
+             C246,202 204,162 161,162 Z"
           fill="url(#litGlassGrad)" opacity="0"/>
 
-        <!-- ══ INTERNAL STRUCTURE ══ -->
-        <!-- Glass stem (tiang kaca di tengah) -->
-        <line x1="130" y1="232" x2="130" y2="175"
-          stroke="#c8b060" stroke-width="2.2" stroke-opacity="0.55"/>
-
-        <!-- Support wire kiri -->
-        <line x1="130" y1="175" x2="106" y2="155"
-          stroke="#b09040" stroke-width="1.6" stroke-opacity="0.65"/>
-
-        <!-- Support wire kanan -->
-        <line x1="130" y1="175" x2="154" y2="155"
-          stroke="#b09040" stroke-width="1.6" stroke-opacity="0.65"/>
+        <!-- ══ STEM INTERNAL Y:446→360 ══ -->
+        <line x1="130" y1="446" x2="130" y2="358"
+          stroke="#c8b060" stroke-width="2.5" stroke-opacity="0.52"/>
+        <line x1="130" y1="358" x2="104" y2="332"
+          stroke="#b09040" stroke-width="1.8" stroke-opacity="0.62"/>
+        <line x1="130" y1="358" x2="156" y2="332"
+          stroke="#b09040" stroke-width="1.8" stroke-opacity="0.62"/>
 
         <!-- ══ FILAMEN ══ -->
-        <g id="filamentGroup" filter="url(#filamentGlow)">
-
-          <!-- Coil kiri (zig-zag realistis) -->
+        <g id="filamentGroup" filter="url(#filGlow)">
+          <!-- Coil kiri -->
           <path id="filamentLeft"
-            d="M106,155 C104,152 110,149 106,146 C103,143 109,140 106,137
-               C103,134 109,131 106,128 C103,125 109,122 106,119
-               C103,116 108,114 106,112"
-            stroke="#5a3800" stroke-width="2.3"
+            d="M104,332 C101,328 108,324 104,320 C100,316 107,312 104,308
+               C100,304 107,300 104,296 C101,293 106,290 104,288"
+            stroke="#4a2800" stroke-width="2.5"
             stroke-linecap="round" fill="none" class="filament-wire"/>
-
-          <!-- Bridge horizontal -->
+          <!-- Bridge -->
           <path id="filamentBridge"
-            d="M106,112 C112,108 118,106 130,105 C142,106 148,108 154,112"
-            stroke="#5a3800" stroke-width="2.3"
+            d="M104,288 C112,283 120,281 130,280 C140,281 148,283 156,288"
+            stroke="#4a2800" stroke-width="2.5"
             stroke-linecap="round" fill="none" class="filament-wire"/>
-
           <!-- Coil kanan -->
           <path id="filamentRight"
-            d="M154,112 C152,114 157,116 154,119 C151,122 157,125 154,128
-               C151,131 157,134 154,137 C151,140 157,143 154,146
-               C151,149 157,152 154,155"
-            stroke="#5a3800" stroke-width="2.3"
+            d="M156,288 C154,290 159,293 156,296 C153,300 159,304 156,308
+               C153,312 159,316 156,320 C153,324 159,328 156,332"
+            stroke="#4a2800" stroke-width="2.5"
             stroke-linecap="round" fill="none" class="filament-wire"/>
-
         </g>
 
-        <!-- ══ GLASS REFLECTIONS ══ -->
-        <!-- Highlight utama kiri atas -->
-        <ellipse cx="88" cy="68" rx="26" ry="48"
+        <!-- ══ REFLEKSI KACA ══ -->
+        <ellipse cx="68" cy="215" rx="23" ry="54"
           fill="url(#glossGrad)"
-          transform="rotate(-22,88,68)" opacity="0.80"/>
-
-        <!-- Highlight kecil tambahan -->
-        <ellipse cx="76" cy="52" rx="9" ry="16"
-          fill="#ffffff" opacity="0.25"
-          transform="rotate(-18,76,52)"/>
-
-        <!-- Rim highlight kanan bawah -->
-        <path d="M176,182 C188,170 200,152 207,132"
+          transform="rotate(-26,68,215)" opacity="0.80"/>
+        <ellipse cx="54" cy="194" rx="8" ry="16"
+          fill="#ffffff" opacity="0.23"
+          transform="rotate(-20,54,194)"/>
+        <path d="M212,365 C224,346 236,318 240,286"
           stroke="#ffffff" stroke-width="2.5"
-          stroke-opacity="0.12" stroke-linecap="round" fill="none"/>
+          stroke-opacity="0.11" stroke-linecap="round" fill="none"/>
 
-        <!-- ══ LEHER BOHLAM (sambung ke socket di atas) ══ -->
-        <!-- Neck taper -->
-        <path d="M100,232 L98,245 Q98,258 110,258 L150,258
-                 Q162,258 162,245 L160,232 Z"
-          fill="url(#neckGrad)"
-          stroke="#9a7020" stroke-width="1.1" stroke-opacity="0.6"/>
-
-        <!-- Ulir pertama -->
-        <rect x="100" y="258" width="60" height="6" rx="1.5"
-          fill="#8a6010" fill-opacity="0.75"
-          stroke="#d0a030" stroke-width="0.6" stroke-opacity="0.5"/>
-
-        <!-- Ulir kedua -->
-        <rect x="101" y="264" width="58" height="5" rx="1"
-          fill="#7a5008" fill-opacity="0.65"
-          stroke="#c09020" stroke-width="0.5" stroke-opacity="0.4"/>
-
-        <!-- Refleksi sisi leher -->
-        <line x1="103" y1="235" x2="102" y2="267"
-          stroke="#f5e090" stroke-width="1.5" stroke-opacity="0.28" stroke-linecap="round"/>
-        <line x1="157" y1="235" x2="158" y2="267"
-          stroke="#f5e090" stroke-width="1.5" stroke-opacity="0.18" stroke-linecap="round"/>
-
-        <!-- Base socket bawah (ulir bagian bawah) -->
-        <rect x="103" y="269" width="54" height="4" rx="1"
-          fill="#6a4808" fill-opacity="0.7"
-          stroke="#b08020" stroke-width="0.5" stroke-opacity="0.3"/>
+        <!-- ══ BASE DEKORATIF BAWAH GLOBE ══ -->
+        <path d="M108,446 Q108,456 120,458 L140,458 Q152,456 152,446 Z"
+          fill="url(#metalGrad)" stroke="#9a7020" stroke-width="0.8" stroke-opacity="0.4"/>
 
       </svg>
 
-      <!-- Bloom layers -->
-      <div id="bloomLayer" class="bloom-layer"></div>
+      <!-- Bloom CSS layers -->
+      <div id="bloomLayer"      class="bloom-layer"></div>
       <div id="bloomLayerOuter" class="bloom-layer bloom-layer--outer"></div>
-    </div><!-- end bulb-wrapper -->
+    </div><!-- /lamp-wrap -->
 
-    <!-- ══ SAKLAR (di tengah, bawah lampu) ══ -->
+    <!-- ══ SAKLAR — posisi fixed, tidak bergeser ══ -->
     <div class="switch-zone">
-      <div class="switch-container">
-        <span class="switch-label" id="switchLabel">OFF</span>
-        <button
-          id="toggleSwitch"
-          class="toggle-switch"
-          role="switch"
-          aria-checked="false"
-          aria-label="Toggle lampu"
-          title="Klik untuk nyalakan/matikan lampu">
-          <span class="toggle-thumb"></span>
-        </button>
-        <span class="switch-label switch-label--on">ON</span>
-      </div>
+      <span class="sw-lbl sw-lbl--off">OFF</span>
+      <button id="toggleSwitch" class="toggle-switch"
+        role="switch" aria-checked="false" aria-label="Toggle lampu">
+        <span class="toggle-thumb"></span>
+      </button>
+      <span class="sw-lbl sw-lbl--on">ON</span>
     </div>
 
-  </div><!-- end scene -->
+  </div><!-- /scene -->
 
   <script src="script.js"></script>
 </body>
