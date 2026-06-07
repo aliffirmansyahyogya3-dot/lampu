@@ -3,146 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
-  <title>Edison Bulb - Lampu Gantung</title>
-  <style>
-    * {
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: radial-gradient(circle at 30% 20%, #1a1e2a, #0c0f16);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-family: system-ui, 'Segoe UI', 'Inter', 'Poppins', sans-serif;
-    }
-
-    /* efek kanvas glow ambient */
-    #glowCanvas, #particleCanvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .scene {
-      position: relative;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: 2rem 1rem;
-    }
-
-    .lamp-wrap {
-      position: relative;
-      width: 260px;
-      margin: 0 auto;
-      filter: drop-shadow(0 18px 18px rgba(0,0,0,0.35));
-      transition: filter 0.2s ease;
-    }
-
-    #mainSVG {
-      display: block;
-      width: 100%;
-      height: auto;
-      transition: all 0.2s;
-    }
-
-    /* Bloom layers (glow luar saat ON) */
-    .bloom-layer {
-      position: absolute;
-      top: 48%;
-      left: 50%;
-      width: 170%;
-      height: 170%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,180,60,0) 0%, rgba(255,140,20,0) 90%);
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-      opacity: 0;
-      z-index: -1;
-    }
-
-    .bloom-layer--outer {
-      width: 230%;
-      height: 230%;
-      filter: blur(28px);
-    }
-
-    /* SAKLAR toggle gaya premium */
-    .switch-zone {
-      margin-top: 42px;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      background: rgba(18, 22, 32, 0.65);
-      backdrop-filter: blur(12px);
-      padding: 12px 28px;
-      border-radius: 100px;
-      border: 1px solid rgba(230, 200, 120, 0.25);
-      box-shadow: 0 6px 14px rgba(0,0,0,0.3);
-    }
-
-    .sw-lbl {
-      font-weight: 600;
-      letter-spacing: 1px;
-      font-size: 1rem;
-      transition: color 0.2s;
-    }
-
-    .sw-lbl--off { color: #9aa2b5; }
-    .sw-lbl--on  { color: #9aa2b5; }
-
-    .toggle-switch {
-      width: 68px;
-      height: 32px;
-      background: #2e3548;
-      border-radius: 40px;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-      position: relative;
-      transition: background 0.25s;
-      box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 1px rgba(255,255,240,0.1);
-    }
-
-    .toggle-thumb {
-      position: absolute;
-      top: 3px;
-      left: 4px;
-      width: 26px;
-      height: 26px;
-      background: #f5f0e0;
-      border-radius: 50%;
-      transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-    }
-
-    .toggle-switch[aria-checked="true"] {
-      background: #e68a2e;
-    }
-
-    .toggle-switch[aria-checked="true"] .toggle-thumb {
-      transform: translateX(34px);
-      background: #fff6e5;
-    }
-
-    /* status ON -> label aktif */
-    body.lamp-on .sw-lbl--off { color: #9aa2b5; }
-    body.lamp-on .sw-lbl--on  { color: #ffb347; text-shadow: 0 0 4px #ff9f2e; }
-    body:not(.lamp-on) .sw-lbl--off { color: #ffb347; text-shadow: 0 0 4px #ff9f2e; }
-    body:not(.lamp-on) .sw-lbl--on  { color: #9aa2b5; }
-  </style>
+  <title>Edison Bulb</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
@@ -152,340 +14,239 @@
   <div class="scene">
     <div class="lamp-wrap">
       <!--
-        ⚡ LAMPU GANTUNG EDISON ⚡
-        Orientasi: SOCKET di ATAS → GLOBE di BAWAH (seperti gantung biasa)
-        Y =   0..60  : kabel + cap pengikat
-        Y =  60..150 : socket barel + ulir
-        Y = 150..178 : neck melebar ke bawah
-        Y = 178..462 : GLOBE besar (mengembang)
-        Y = 462..474 : base dekoratif ujung bawah
+        SVG ORIENTATION (top→bottom):
+          Y=0..55    : kabel
+          Y=55..75   : cap pengikat kabel (silinder kecil)
+          Y=75..145  : socket barel (ulir Edison)
+          Y=145..172 : neck melebar ke bawah
+          Y=172..460 : GLOBE besar (dome mengembang ke bawah)
+          Y=460..472 : base dekoratif ujung bawah globe
+
+        Globe = bulat besar di BAWAH. Socket = ramping di ATAS.
+        Ini orientasi lampu gantung Edison yang benar.
       -->
       <svg id="mainSVG" viewBox="0 0 260 480" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <!-- Kaca globe transparan + gradasi hangat -->
+          <!-- ── Kaca globe transparan ── -->
           <radialGradient id="glassGrad" cx="32%" cy="28%" r="70%">
-            <stop offset="0%"   stop-color="#fffbf2" stop-opacity="0.28"/>
-            <stop offset="28%"  stop-color="#f2e4a8" stop-opacity="0.12"/>
-            <stop offset="68%"  stop-color="#c09848" stop-opacity="0.06"/>
-            <stop offset="100%" stop-color="#7a5210" stop-opacity="0.16"/>
+            <stop offset="0%"   stop-color="#fffbf2" stop-opacity="0.24"/>
+            <stop offset="25%"  stop-color="#f2e4a8" stop-opacity="0.09"/>
+            <stop offset="65%"  stop-color="#c09848" stop-opacity="0.04"/>
+            <stop offset="100%" stop-color="#7a5210" stop-opacity="0.13"/>
           </radialGradient>
 
-          <radialGradient id="litGrad" cx="48%" cy="48%" r="56%">
-            <stop offset="0%"   stop-color="#fff0aa" stop-opacity="0"/>
-            <stop offset="40%"  stop-color="#ffb833" stop-opacity="0"/>
-            <stop offset="100%" stop-color="#d06a08" stop-opacity="0"/>
+          <!-- ── Kaca hangat saat menyala ── -->
+          <radialGradient id="litGrad" cx="50%" cy="46%" r="54%">
+            <stop offset="0%"   stop-color="#ffe990" stop-opacity="0"/>
+            <stop offset="38%"  stop-color="#ffaa22" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#c05a00" stop-opacity="0"/>
           </radialGradient>
 
-          <radialGradient id="glossGrad" cx="28%" cy="24%" r="48%">
-            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
-            <stop offset="38%"  stop-color="#ffffff" stop-opacity="0.12"/>
+          <!-- ── Gloss highlight kaca ── -->
+          <radialGradient id="glossGrad" cx="25%" cy="22%" r="46%">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.50"/>
+            <stop offset="42%"  stop-color="#ffffff" stop-opacity="0.11"/>
             <stop offset="100%" stop-color="#ffffff" stop-opacity="0.00"/>
           </radialGradient>
 
-          <!-- Logam kuningan terang (socket) -->
+          <!-- ── Logam kuningan terang ── -->
           <linearGradient id="brass" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="#1e1405"/>
-            <stop offset="15%"  stop-color="#745210"/>
-            <stop offset="35%"  stop-color="#d4a03c"/>
-            <stop offset="52%"  stop-color="#f8d470"/>
-            <stop offset="68%"  stop-color="#d4a03c"/>
-            <stop offset="85%"  stop-color="#745210"/>
-            <stop offset="100%" stop-color="#1e1405"/>
+            <stop offset="0%"   stop-color="#221602"/>
+            <stop offset="14%"  stop-color="#7a5610"/>
+            <stop offset="34%"  stop-color="#d09c34"/>
+            <stop offset="50%"  stop-color="#f0c850"/>
+            <stop offset="66%"  stop-color="#d09c34"/>
+            <stop offset="86%"  stop-color="#7a5610"/>
+            <stop offset="100%" stop-color="#221602"/>
           </linearGradient>
 
-          <!-- Logam gelap untuk ring/band -->
+          <!-- ── Logam gelap (ring/band) ── -->
           <linearGradient id="brassdk" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stop-color="#0c0802"/>
-            <stop offset="22%"  stop-color="#4a3410"/>
+            <stop offset="0%"   stop-color="#0e0a02"/>
+            <stop offset="25%"  stop-color="#4e380a"/>
             <stop offset="50%"  stop-color="#aa8224"/>
-            <stop offset="78%"  stop-color="#4a3410"/>
-            <stop offset="100%" stop-color="#0c0802"/>
+            <stop offset="75%"  stop-color="#4e380a"/>
+            <stop offset="100%" stop-color="#0e0a02"/>
           </linearGradient>
 
-          <!-- Glow filamen -->
-          <filter id="filGlow" x="-120%" y="-120%" width="340%" height="340%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="5.5" result="b"/>
+          <!-- ── Glow filter filamen ── -->
+          <filter id="filGlow" x="-150%" y="-150%" width="400%" height="400%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
             <feComposite in="SourceGraphic" in2="b" operator="over"/>
           </filter>
         </defs>
 
-        <!-- ================= KABEL (Y 0 → 58) ================= -->
-        <line x1="130" y1="0"  x2="130" y2="60"
-          stroke="#141008" stroke-width="3.2" stroke-linecap="round"/>
-        <line x1="131.8" y1="2" x2="131.8" y2="59"
-          stroke="#7a5a1e" stroke-width="1" stroke-opacity="0.5" stroke-linecap="round"/>
+        <!-- ════════════════════════════════
+             KABEL  (Y 0 → 55)
+        ════════════════════════════════ -->
+        <line x1="130" y1="0"  x2="130" y2="57"
+          stroke="#141008" stroke-width="3" stroke-linecap="round"/>
+        <!-- kilap kabel -->
+        <line x1="131.5" y1="2" x2="131.5" y2="56"
+          stroke="#7a5a1e" stroke-width="1" stroke-opacity="0.45" stroke-linecap="round"/>
 
-        <!-- ================= CAP PENGIKAT (Y 58 → 75) ================= -->
-        <rect x="118" y="58" width="24" height="17" rx="5" fill="url(#brass)"/>
-        <rect x="118" y="72" width="24" height="3" rx="1.5" fill="#000" fill-opacity="0.28"/>
+        <!-- ════════════════════════════════
+             CAP PENGIKAT KABEL  (Y 55 → 72)
+             Silinder kecil, lebar 22px
+        ════════════════════════════════ -->
+        <rect x="119" y="55" width="22" height="17" rx="5"
+          fill="url(#brass)"/>
+        <!-- shadow bawah cap -->
+        <rect x="119" y="69" width="22" height="3" rx="1"
+          fill="#000" fill-opacity="0.32"/>
 
-        <!-- ================= SOCKET BAREL (Y 75 → 145) ================= -->
-        <!-- ring atas socket -->
-        <rect x="103" y="75" width="54" height="10" rx="3" fill="url(#brassdk)"/>
-        <!-- barel utama -->
-        <rect x="103" y="85" width="54" height="50" fill="url(#brass)"/>
-        <!-- garis ulir -->
-        <line x1="103" y1="93"  x2="157" y2="93"  stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
-        <line x1="103" y1="100" x2="157" y2="100" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
-        <line x1="103" y1="107" x2="157" y2="107" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
-        <line x1="103" y1="114" x2="157" y2="114" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
-        <line x1="103" y1="121" x2="157" y2="121" stroke="#000" stroke-opacity="0.22" stroke-width="1.2"/>
-        <!-- kilap vertikal -->
-        <rect x="124" y="85" width="12" height="50" fill="#fff" fill-opacity="0.08"/>
-        <!-- ring bawah socket -->
-        <rect x="103" y="135" width="54" height="10" rx="3" fill="url(#brassdk)"/>
+        <!-- ════════════════════════════════
+             SOCKET BAREL  (Y 72 → 140)
+             Lebar 52px simetris terhadap cx=130
+        ════════════════════════════════ -->
+        <!-- Ring atas -->
+        <rect x="104" y="72" width="52" height="10" rx="3"
+          fill="url(#brassdk)"/>
+        <!-- Barel utama -->
+        <rect x="104" y="82" width="52" height="48" fill="url(#brass)"/>
+        <!-- Ulir horizontal -->
+        <line x1="104" y1="89"  x2="156" y2="89"  stroke="#000" stroke-opacity="0.20" stroke-width="1.3"/>
+        <line x1="104" y1="96"  x2="156" y2="96"  stroke="#000" stroke-opacity="0.20" stroke-width="1.3"/>
+        <line x1="104" y1="103" x2="156" y2="103" stroke="#000" stroke-opacity="0.20" stroke-width="1.3"/>
+        <line x1="104" y1="110" x2="156" y2="110" stroke="#000" stroke-opacity="0.20" stroke-width="1.3"/>
+        <line x1="104" y1="117" x2="156" y2="117" stroke="#000" stroke-opacity="0.20" stroke-width="1.3"/>
+        <line x1="104" y1="124" x2="156" y2="124" stroke="#000" stroke-opacity="0.20" stroke-width="1.3"/>
+        <!-- Kilap logam vertikal tengah -->
+        <rect x="124" y="82" width="12" height="48" fill="#fff" fill-opacity="0.09"/>
+        <!-- Ring bawah -->
+        <rect x="104" y="130" width="52" height="10" rx="3"
+          fill="url(#brassdk)"/>
 
-        <!-- ================= NECK (leher melebar) Y 145 → 174 ================= -->
-        <path d="M103,145 L94,174 L166,174 L157,145 Z" fill="url(#brass)"/>
-        <!-- band batas -->
-        <rect x="94" y="170" width="72" height="4.5" fill="url(#brassdk)" rx="2"/>
+        <!-- ════════════════════════════════
+             NECK (leher melebar) Y 140 → 168
+             Socket lebar 52 (x:104..156) → Neck bawah lebar 70 (x:95..165)
+        ════════════════════════════════ -->
+        <path d="M104,140 L95,168 L165,168 L156,140 Z"
+          fill="url(#brass)"/>
+        <!-- Band batas bawah neck -->
+        <rect x="95" y="165" width="70" height="4"
+          fill="url(#brassdk)" rx="1.5"/>
 
-        <!-- ================= GLOBE BESAR (Y 174 → 456) ================= -->
-        <!-- Globe lebar maksimal sekitar 234px, bentuk klasik lampu gantung -->
+        <!-- ════════════════════════════════
+             GLOBE BESAR  (Y 168 → 456)
+             Sambung di x:95..165 pada Y=168.
+             Globe sangat bulat, lebar max ≈ 230px di Y≈300.
+             Ini lampu Edison globe besar.
+        ════════════════════════════════ -->
         <path id="bulbBody"
-          d="M94,174
-             C44,174 6,216 6,278
-             C6,348 46,400 82,428
-             C98,440 108,454 108,464
-             L152,464
-             C152,454 162,440 178,428
-             C214,400 254,348 254,278
-             C254,216 216,174 166,174 Z"
+          d="M95,168
+             C46,168 8,210 8,272
+             C8,340 48,392 84,420
+             C100,432 110,446 110,456
+             L150,456
+             C150,446 160,432 176,420
+             C212,392 252,340 252,272
+             C252,210 214,168 165,168 Z"
           fill="url(#glassGrad)"
-          stroke="#c09828" stroke-width="1.3" stroke-opacity="0.48"/>
+          stroke="#c09828" stroke-width="1.4" stroke-opacity="0.42"/>
 
-        <!-- layer internal panas (controlled via js) -->
+        <!-- Layer kaca panas (dikontrol JS) -->
         <path id="litGlass"
-          d="M94,174
-             C44,174 6,216 6,278
-             C6,348 46,400 82,428
-             C98,440 108,454 108,464
-             L152,464
-             C152,454 162,440 178,428
-             C214,400 254,348 254,278
-             C254,216 216,174 166,174 Z"
+          d="M95,168
+             C46,168 8,210 8,272
+             C8,340 48,392 84,420
+             C100,432 110,446 110,456
+             L150,456
+             C150,446 160,432 176,420
+             C212,392 252,340 252,272
+             C252,210 214,168 165,168 Z"
           fill="url(#litGrad)" opacity="0"/>
 
-        <!-- ================= INTERNAL STRUCTURE (STEM & SUPPORT) ================= -->
-        <!-- glass stem dari bawah globe naik ke filamen -->
-        <line x1="130" y1="464" x2="130" y2="375" stroke="#d0bc68" stroke-width="2.5" stroke-opacity="0.55"/>
-        <!-- support wire kiri/kanan -->
-        <line x1="130" y1="375" x2="103" y2="348" stroke="#b89840" stroke-width="1.8" stroke-opacity="0.65"/>
-        <line x1="130" y1="375" x2="157" y2="348" stroke="#b89840" stroke-width="1.8" stroke-opacity="0.65"/>
+        <!-- ════════════════════════════════
+             INTERNAL STRUCTURE
+        ════════════════════════════════ -->
+        <!-- Glass stem (tiang dari bawah ke filamen) -->
+        <line x1="130" y1="456" x2="130" y2="365"
+          stroke="#d0bc68" stroke-width="2.5" stroke-opacity="0.55"/>
+        <!-- Support wire kiri -->
+        <line x1="130" y1="365" x2="102" y2="338"
+          stroke="#b89840" stroke-width="1.8" stroke-opacity="0.65"/>
+        <!-- Support wire kanan -->
+        <line x1="130" y1="365" x2="158" y2="338"
+          stroke="#b89840" stroke-width="1.8" stroke-opacity="0.65"/>
 
-        <!-- ================= FILAMEN (posisi tengah globe, Y ≈ 298..348) ================= -->
+        <!-- ════════════════════════════════
+             FILAMEN (di tengah globe, Y ≈ 290..338)
+        ════════════════════════════════ -->
         <g id="filamentGroup" filter="url(#filGlow)">
-          <!-- filamen kiri bawah ke atas bentuk zigzag lembut -->
+          <!-- Coil kiri -->
           <path id="filamentLeft"
-            d="M103,348
-               C100,344 107,340 103,336
-               C99,332 106,328 103,324
-               C99,320 106,316 103,312
-               C100,309 105,306 103,304"
-            stroke="#3e2000" stroke-width="2.6" stroke-linecap="round" fill="none" class="filament-wire"/>
-          <!-- bridge atas -->
+            d="M102,338
+               C99,334 106,330 102,326
+               C98,322 105,318 102,314
+               C98,310 105,306 102,302
+               C99,299 104,296 102,294"
+            stroke="#3e2000" stroke-width="2.6"
+            stroke-linecap="round" fill="none" class="filament-wire"/>
+          <!-- Bridge atas -->
           <path id="filamentBridge"
-            d="M103,304 C111,298 121,296 130,295 C139,296 149,298 157,304"
-            stroke="#3e2000" stroke-width="2.6" stroke-linecap="round" fill="none" class="filament-wire"/>
-          <!-- filamen kanan bawah -->
+            d="M102,294 C110,289 120,287 130,286 C140,287 150,289 158,294"
+            stroke="#3e2000" stroke-width="2.6"
+            stroke-linecap="round" fill="none" class="filament-wire"/>
+          <!-- Coil kanan -->
           <path id="filamentRight"
-            d="M157,304
-               C155,306 160,309 157,312
-               C154,316 160,320 157,324
-               C154,328 160,332 157,336
-               C154,340 160,344 157,348"
-            stroke="#3e2000" stroke-width="2.6" stroke-linecap="round" fill="none" class="filament-wire"/>
+            d="M158,294
+               C156,296 161,299 158,302
+               C155,306 161,310 158,314
+               C155,318 161,322 158,326
+               C155,330 161,334 158,338"
+            stroke="#3e2000" stroke-width="2.6"
+            stroke-linecap="round" fill="none" class="filament-wire"/>
         </g>
 
-        <!-- ================= REFLEKSI / GLOSS KACA ================= -->
-        <ellipse cx="64" cy="232" rx="23" ry="58" fill="url(#glossGrad)" transform="rotate(-26,64,232)" opacity="0.86"/>
-        <ellipse cx="50" cy="210" rx="8" ry="16" fill="#ffffff" opacity="0.28" transform="rotate(-22,50,210)"/>
-        <path d="M222,390 C236,366 250,332 252,296" stroke="#ffffff" stroke-width="2.6" stroke-opacity="0.12" stroke-linecap="round" fill="none"/>
-        <ellipse cx="240" cy="288" rx="6" ry="13" fill="#ffffff" opacity="0.12" transform="rotate(18,240,288)"/>
+        <!-- ════════════════════════════════
+             REFLEKSI & GLOSS KACA
+        ════════════════════════════════ -->
+        <!-- Highlight utama kiri-atas -->
+        <ellipse cx="62" cy="226" rx="22" ry="56"
+          fill="url(#glossGrad)"
+          transform="rotate(-28,62,226)" opacity="0.82"/>
+        <!-- Highlight kecil -->
+        <ellipse cx="48" cy="204" rx="8" ry="15"
+          fill="#ffffff" opacity="0.26"
+          transform="rotate(-22,48,204)"/>
+        <!-- Rim kanan bawah (refleksi tepi) -->
+        <path d="M218,380 C232,358 246,326 250,290"
+          stroke="#ffffff" stroke-width="2.5"
+          stroke-opacity="0.10" stroke-linecap="round" fill="none"/>
+        <!-- Glint kecil kanan tengah -->
+        <ellipse cx="236" cy="280" rx="5" ry="12"
+          fill="#ffffff" opacity="0.10"
+          transform="rotate(20,236,280)"/>
 
-        <!-- ================= BASE BAWAH GLOBE ================= -->
-        <path d="M108,464 Q108,476 120,478 L140,478 Q152,476 152,464 Z" fill="url(#brass)" stroke="#9a7020" stroke-width="0.9" stroke-opacity="0.5"/>
-        <ellipse cx="130" cy="478" rx="10" ry="4.2" fill="url(#brassdk)"/>
+        <!-- ════════════════════════════════
+             BASE BAWAH GLOBE (dekoratif)
+        ════════════════════════════════ -->
+        <path d="M110,456 Q110,468 122,470 L138,470 Q150,468 150,456 Z"
+          fill="url(#brass)" stroke="#9a7020" stroke-width="0.9" stroke-opacity="0.45"/>
+        <!-- Tip ujung bawah -->
+        <ellipse cx="130" cy="470" rx="8" ry="4"
+          fill="url(#brassdk)"/>
+
       </svg>
 
+      <!-- CSS Bloom -->
       <div id="bloomLayer"      class="bloom-layer"></div>
       <div id="bloomLayerOuter" class="bloom-layer bloom-layer--outer"></div>
     </div>
 
+    <!-- SAKLAR -->
     <div class="switch-zone">
       <span class="sw-lbl sw-lbl--off">OFF</span>
-      <button id="toggleSwitch" class="toggle-switch" role="switch" aria-checked="false" aria-label="Toggle lampu">
+      <button id="toggleSwitch" class="toggle-switch"
+        role="switch" aria-checked="false" aria-label="Toggle lampu">
         <span class="toggle-thumb"></span>
       </button>
       <span class="sw-lbl sw-lbl--on">ON</span>
     </div>
+
   </div>
 
-  <script>
-    (function(){
-      // DOM elements
-      const svg = document.getElementById('mainSVG');
-      const litGlass = document.getElementById('litGlass');
-      const filamentLeft = document.getElementById('filamentLeft');
-      const filamentBridge = document.getElementById('filamentBridge');
-      const filamentRight = document.getElementById('filamentRight');
-      const toggleBtn = document.getElementById('toggleSwitch');
-      const bloomLayer = document.getElementById('bloomLayer');
-      const bloomLayerOuter = document.getElementById('bloomLayerOuter');
-      
-      // Canvas ambient glow dan partikel
-      const glowCanvas = document.getElementById('glowCanvas');
-      const particleCanvas = document.getElementById('particleCanvas');
-      let glowCtx, particleCtx;
-      let animationId = null;
-      let particles = [];
-      let lampOn = false;
-      
-      // warna state
-      const FILAMENT_DARK = '#3e2000';
-      const FILAMENT_LIT = '#ffa032';
-      const GLASS_LIT_OPACITY = 0.45;
-      
-      // inisialisasi canvas
-      function initCanvases() {
-        if(glowCanvas) {
-          glowCanvas.width = window.innerWidth;
-          glowCanvas.height = window.innerHeight;
-          glowCtx = glowCanvas.getContext('2d');
-        }
-        if(particleCanvas) {
-          particleCanvas.width = window.innerWidth;
-          particleCanvas.height = window.innerHeight;
-          particleCtx = particleCanvas.getContext('2d');
-        }
-        window.addEventListener('resize', () => {
-          if(glowCanvas) { glowCanvas.width = window.innerWidth; glowCanvas.height = window.innerHeight; }
-          if(particleCanvas) { particleCanvas.width = window.innerWidth; particleCanvas.height = window.innerHeight; }
-        });
-      }
-      
-      // efek ambient glow (coretan cahaya halus)
-      function drawAmbientGlow() {
-        if(!glowCtx) return;
-        glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
-        if(!lampOn) return;
-        
-        const centerX = glowCanvas.width * 0.5;
-        const centerY = glowCanvas.height * 0.62;
-        const maxRad = Math.min(glowCanvas.width, glowCanvas.height) * 0.38;
-        const gradient = glowCtx.createRadialGradient(centerX, centerY, 8, centerX, centerY, maxRad);
-        gradient.addColorStop(0, 'rgba(255, 180, 70, 0.28)');
-        gradient.addColorStop(0.4, 'rgba(255, 120, 30, 0.12)');
-        gradient.addColorStop(1, 'rgba(30, 20, 10, 0)');
-        glowCtx.fillStyle = gradient;
-        glowCtx.fillRect(0, 0, glowCanvas.width, glowCanvas.height);
-      }
-      
-      // partikel debu / floating sparkle
-      function initParticles() {
-        const count = 46;
-        for(let i=0; i<count; i++) {
-          particles.push({
-            x: Math.random(),
-            y: Math.random() * 0.8 + 0.2,
-            size: 1 + Math.random() * 3,
-            alpha: 0.2 + Math.random() * 0.5,
-            speedX: (Math.random() - 0.5) * 0.002,
-            speedY: 0.0006 + Math.random() * 0.0015,
-          });
-        }
-      }
-      
-      function drawParticles() {
-        if(!particleCtx) return;
-        particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
-        if(!lampOn) {
-          // kalau mati partikel redup
-          particleCtx.clearRect(0,0, particleCanvas.width, particleCanvas.height);
-          return;
-        }
-        
-        for(let p of particles) {
-          p.x += p.speedX;
-          p.y += p.speedY;
-          if(p.x > 1) p.x = 0;
-          if(p.x < 0) p.x = 1;
-          if(p.y > 1) p.y = 0.1;
-          
-          const screenX = p.x * particleCanvas.width;
-          const screenY = p.y * particleCanvas.height;
-          const flicker = 0.5 + Math.random() * 0.5;
-          const glowAlpha = p.alpha * (0.5 + Math.sin(Date.now() * 0.002 + p.x * 20) * 0.3);
-          particleCtx.beginPath();
-          particleCtx.arc(screenX, screenY, p.size * 0.8, 0, Math.PI*2);
-          particleCtx.fillStyle = `rgba(255, 210, 100, ${glowAlpha * 0.7})`;
-          particleCtx.fill();
-          particleCtx.beginPath();
-          particleCtx.arc(screenX-0.7, screenY-0.5, p.size*0.4, 0, Math.PI*2);
-          particleCtx.fillStyle = `rgba(255, 255, 210, ${glowAlpha * 0.9})`;
-          particleCtx.fill();
-        }
-      }
-      
-      function updateVisuals() {
-        if(lampOn) {
-          // Filamen menyala
-          filamentLeft?.setAttribute('stroke', FILAMENT_LIT);
-          filamentBridge?.setAttribute('stroke', FILAMENT_LIT);
-          filamentRight?.setAttribute('stroke', FILAMENT_LIT);
-          if(litGlass) litGlass.setAttribute('opacity', GLASS_LIT_OPACITY);
-          // Bloom effect
-          if(bloomLayer) bloomLayer.style.opacity = '0.65';
-          if(bloomLayerOuter) bloomLayerOuter.style.opacity = '0.45';
-          document.body.classList.add('lamp-on');
-        } else {
-          filamentLeft?.setAttribute('stroke', FILAMENT_DARK);
-          filamentBridge?.setAttribute('stroke', FILAMENT_DARK);
-          filamentRight?.setAttribute('stroke', FILAMENT_DARK);
-          if(litGlass) litGlass.setAttribute('opacity', '0');
-          if(bloomLayer) bloomLayer.style.opacity = '0';
-          if(bloomLayerOuter) bloomLayerOuter.style.opacity = '0';
-          document.body.classList.remove('lamp-on');
-        }
-        drawAmbientGlow();
-        drawParticles();
-      }
-      
-      function animate() {
-        updateVisuals();
-        animationId = requestAnimationFrame(animate);
-      }
-      
-      function toggleLamp() {
-        lampOn = !lampOn;
-        toggleBtn.setAttribute('aria-checked', lampOn);
-        updateVisuals();
-      }
-      
-      // pasang event
-      if(toggleBtn) {
-        toggleBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          toggleLamp();
-        });
-      }
-      
-      initCanvases();
-      initParticles();
-      animate();
-      
-      // resize handling untuk canvas glow/partikel
-      window.addEventListener('resize', () => {
-        if(glowCanvas) { glowCanvas.width = window.innerWidth; glowCanvas.height = window.innerHeight; }
-        if(particleCanvas) { particleCanvas.width = window.innerWidth; particleCanvas.height = window.innerHeight; }
-        drawAmbientGlow();
-      });
-      
-      // default state mati
-      lampOn = false;
-      toggleBtn.setAttribute('aria-checked', 'false');
-      updateVisuals();
-    })();
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
