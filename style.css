@@ -1,235 +1,186 @@
 /* ═══════════════════════════════════════════════════════════
-   STYLE.CSS — Edison Bulb v3
+   STYLE.CSS — Edison Bulb v4 (globe bawah, socket atas)
    ═══════════════════════════════════════════════════════════ */
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --lamp-w: 230px;   /* lebar SVG di layar */
   --on-dur:  300ms;
   --off-dur: 480ms;
   --ease-on:  cubic-bezier(0.22,1,0.36,1);
   --ease-off: cubic-bezier(0.55,0,0.45,1);
-  /* Lebar SVG lampu di layar */
-  --lamp-w: 220px;
 }
-
-html, body { width:100%; height:100%; overflow:hidden; }
-
-body {
-  background: radial-gradient(ellipse 100% 80% at 50% 0%,
-    #181410 0%, #0e0c0a 50%, #070706 100%);
-  background-color: #080807;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  font-family: 'Courier New', monospace;
+html,body{width:100%;height:100%;overflow:hidden}
+body{
+  background: radial-gradient(ellipse 110% 90% at 50% 0%,
+    #181410 0%,#0d0b09 55%,#070605 100%);
+  background-color:#080706;
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;
+  font-family:'Courier New',monospace;
 }
 
 /* ── CANVAS ─────────────────────────────────────────────── */
-#glowCanvas, #particleCanvas {
-  position: fixed;
-  inset: 0; width:100%; height:100%;
-  pointer-events: none;
+#glowCanvas,#particleCanvas{
+  position:fixed;inset:0;width:100%;height:100%;pointer-events:none;
 }
-#glowCanvas    { z-index: 0; }
-#particleCanvas{ z-index: 3; }
+#glowCanvas{z-index:0}
+#particleCanvas{z-index:3}
 
 /* ── SCENE ──────────────────────────────────────────────── */
-.scene {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 1;
+.scene{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;
+  z-index:1;
 }
 
 /* ── LAMP WRAP ──────────────────────────────────────────── */
-.lamp-wrap {
-  position: relative;
-  width: var(--lamp-w);
-  /* tinggi = lebar × rasio viewBox (500/260) */
-  height: calc(var(--lamp-w) * 1.923);
-  z-index: 2;
+.lamp-wrap{
+  position:relative;
+  width:var(--lamp-w);
+  /* viewBox 260×480 → rasio 480/260 = 1.846 */
+  height:calc(var(--lamp-w)*1.846);
+  z-index:2;
 }
-
-#mainSVG {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+#mainSVG{
+  width:100%;height:100%;
+  overflow:visible;
 }
 
 /* ── FILAMEN ─────────────────────────────────────────────── */
-.filament-wire {
-  stroke: #3a2000;
-  transition:
-    stroke var(--on-dur) var(--ease-on),
-    filter var(--on-dur) var(--ease-on);
+.filament-wire{
+  stroke:#321800;
+  transition:stroke var(--on-dur) var(--ease-on),
+             filter var(--on-dur) var(--ease-on);
 }
-.is-on .filament-wire { stroke: #ffcc44; }
+.is-on .filament-wire{stroke:#ffce46}
 
 /* ── LIT GLASS ──────────────────────────────────────────── */
-#litGlass {
-  opacity: 0;
-  transition: opacity var(--on-dur) var(--ease-on);
-}
-.is-on #litGlass { opacity: 0.42; }
+#litGlass{opacity:0;transition:opacity var(--on-dur) var(--ease-on)}
+.is-on #litGlass{opacity:0.45}
 
 /* ── BLOOM LAYERS ────────────────────────────────────────── */
-.bloom-layer {
-  position: absolute;
-  /* Bloom di separuh bawah lamp-wrap (area globe) */
-  top: 38%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 70%;
-  height: 55%;
-  border-radius: 50%;
-  pointer-events: none;
-  background: transparent;
-  filter: blur(24px);
-  opacity: 0;
-  will-change: opacity, transform;
-  transition:
-    opacity var(--on-dur) var(--ease-on),
-    transform var(--on-dur) var(--ease-on);
+/*
+  Globe ada di Y 35%..97% dari lamp-wrap.
+  Pusat globe ≈ Y 68% dari lamp-wrap.
+  Bloom harus centered di situ.
+*/
+.bloom-layer{
+  position:absolute;
+  top:42%;left:50%;
+  transform:translateX(-50%);
+  width:80%;height:55%;
+  border-radius:50%;
+  pointer-events:none;
+  background:transparent;
+  filter:blur(26px);
+  opacity:0;
+  will-change:opacity,transform;
+  transition:opacity var(--on-dur) var(--ease-on),
+             transform var(--on-dur) var(--ease-on);
 }
-.bloom-layer--outer {
-  width: 140%; height: 80%;
-  top: 30%;
-  filter: blur(50px);
+.bloom-layer--outer{
+  width:155%;height:85%;
+  top:32%;
+  filter:blur(55px);
 }
-
-.is-on .bloom-layer {
-  background: radial-gradient(ellipse at 50% 50%,
-    rgba(255,230,110,0.95) 0%,
-    rgba(255,170,25,0.62)  32%,
-    rgba(255,95,0,0.28)    64%,
-    transparent            82%);
-  opacity: 1;
+.is-on .bloom-layer{
+  background:radial-gradient(ellipse at 50% 50%,
+    rgba(255,232,108,.98) 0%,
+    rgba(255,172,26,.64) 32%,
+    rgba(255,95,0,.28)   65%,
+    transparent          82%);
+  opacity:1;
 }
-.is-on .bloom-layer--outer {
-  background: radial-gradient(ellipse at 50% 50%,
-    rgba(255,210,70,0.36)  0%,
-    rgba(255,130,0,0.20)   40%,
-    rgba(195,75,0,0.09)    68%,
-    transparent            85%);
-  opacity: 1;
+.is-on .bloom-layer--outer{
+  background:radial-gradient(ellipse at 50% 50%,
+    rgba(255,215,72,.40) 0%,
+    rgba(255,132,0,.22)  42%,
+    rgba(195,75,0,.10)   68%,
+    transparent          86%);
+  opacity:1;
 }
 
 /* ── SWITCH ZONE ─────────────────────────────────────────── */
-.switch-zone {
-  /* Margin tetap, tidak pernah berubah */
-  margin-top: 28px;
-  display: flex;
-  align-items: center;
-  /* justify-content center agar selalu di tengah */
-  justify-content: center;
-  gap: 14px;
-  /* lebar fixed agar tidak ada layout shift */
-  width: 160px;
-  z-index: 4;
+.switch-zone{
+  margin-top:26px;
+  display:flex;align-items:center;justify-content:center;
+  gap:14px;
+  width:160px;   /* fixed — tidak ada layout shift */
+  flex-shrink:0;
+  z-index:4;
+}
+.sw-lbl{
+  display:inline-block;
+  width:28px;text-align:center;
+  font-size:.72rem;letter-spacing:.18em;
+  user-select:none;
+  color:#2e2208;
+  transition:color 260ms ease;
+}
+body.is-on .sw-lbl--on {color:#d0a030}
+body.is-on .sw-lbl--off{color:#141006}
+
+/* ── TOGGLE ──────────────────────────────────────────────── */
+.toggle-switch{
+  position:relative;
+  width:64px;height:34px;border-radius:17px;
+  border:none;cursor:pointer;outline:none;
+  padding:0;background:none;
+  -webkit-tap-highlight-color:transparent;
+  flex-shrink:0;
+}
+.toggle-switch::before{
+  content:'';
+  position:absolute;inset:0;border-radius:17px;
+  background:linear-gradient(to bottom,#040302,#0e0904,#040302);
+  border:1.5px solid #1e1508;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.94);
+  transition:border-color 280ms ease,box-shadow 280ms ease;
+}
+.toggle-switch[aria-checked="true"]::before{
+  border-color:#7a5618;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.70),
+             0 0 14px rgba(255,155,0,.55),
+             0 0 30px rgba(255,88,0,.25);
+}
+.toggle-thumb{
+  position:absolute;top:3px;left:3px;
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(140deg,
+    #281602 0%,#624010 35%,#a07026 58%,#624010 80%,#281602 100%);
+  box-shadow:0 2px 8px rgba(0,0,0,.90),
+             0 0 0 1px rgba(160,108,28,.32),
+             inset 0 1px 2px rgba(225,180,62,.42);
+  transition:transform 280ms cubic-bezier(.34,1.56,.64,1),
+             background 280ms ease,
+             box-shadow 280ms ease;
+  will-change:transform;
+}
+.toggle-switch[aria-checked="true"] .toggle-thumb{
+  transform:translateX(30px);
+  background:linear-gradient(140deg,
+    #b06200 0%,#ffaa00 28%,#ffdc54 54%,#ffaa00 76%,#b06200 100%);
+  box-shadow:0 2px 8px rgba(0,0,0,.60),
+             0 0 0 1.5px rgba(255,192,0,.68),
+             0 0 18px rgba(255,166,0,.98),
+             0 0 36px rgba(255,98,0,.55),
+             inset 0 1px 3px rgba(255,255,178,.70);
 }
 
-/* Label OFF / ON — lebar fixed agar tidak geser */
-.sw-lbl {
-  display: inline-block;
-  width: 28px;
-  text-align: center;
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  user-select: none;
-  /* Warna default OFF — tidak berubah posisi, hanya opacity */
-  color: #3a2c0e;
-  /* Transisi hanya color, TIDAK ada perubahan layout */
-  transition: color 280ms ease;
+/* ── AMBIENT ─────────────────────────────────────────────── */
+body::after{
+  content:'';position:fixed;inset:0;
+  pointer-events:none;z-index:0;
+  transition:background var(--on-dur) var(--ease-on);
+  background:transparent;
 }
-/* Label aktif saat ON */
-body.is-on .sw-lbl--on  { color: #d4a030; }
-body.is-on .sw-lbl--off { color: #1e1608; }
-
-/* ── TOGGLE SWITCH ───────────────────────────────────────── */
-.toggle-switch {
-  position: relative;
-  width: 64px; height: 34px;
-  border-radius: 17px;
-  border: none; cursor: pointer; outline: none;
-  padding: 0; background: none;
-  -webkit-tap-highlight-color: transparent;
-  /* Ukuran fixed, tidak berubah */
-  flex-shrink: 0;
-}
-
-/* Track */
-.toggle-switch::before {
-  content: '';
-  position: absolute; inset: 0;
-  border-radius: 17px;
-  background: linear-gradient(to bottom, #060402, #100a04, #060402);
-  border: 1.5px solid #221808;
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.92);
-  transition: border-color 280ms ease, box-shadow 280ms ease;
-}
-.toggle-switch[aria-checked="true"]::before {
-  border-color: #7a5616;
-  box-shadow:
-    inset 0 2px 4px rgba(0,0,0,0.7),
-    0 0 12px rgba(255,150,0,0.50),
-    0 0 26px rgba(255,90,0,0.22);
-}
-
-/* Thumb */
-.toggle-thumb {
-  position: absolute;
-  top: 3px; left: 3px;
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(140deg,
-    #2e1c06 0%, #6a4812 35%, #a87828 58%, #6a4812 80%, #2e1c06 100%);
-  box-shadow:
-    0 2px 7px rgba(0,0,0,0.88),
-    0 0 0 1px rgba(170,115,30,0.32),
-    inset 0 1px 2px rgba(230,185,65,0.40);
-  /* Transition thumb: hanya transform, TIDAK width/height/top agar tidak geser layout */
-  transition:
-    transform 280ms cubic-bezier(0.34,1.56,0.64,1),
-    background  280ms ease,
-    box-shadow  280ms ease;
-  will-change: transform;
-}
-.toggle-switch[aria-checked="true"] .toggle-thumb {
-  transform: translateX(30px);
-  background: linear-gradient(140deg,
-    #b86800 0%, #ffaa00 28%, #ffdd55 54%, #ffaa00 76%, #b86800 100%);
-  box-shadow:
-    0 2px 8px rgba(0,0,0,0.60),
-    0 0 0 1.5px rgba(255,195,0,0.65),
-    0 0 16px rgba(255,165,0,0.95),
-    0 0 34px rgba(255,100,0,0.50),
-    inset 0 1px 3px rgba(255,255,180,0.68);
-}
-
-/* ── AMBIENT ROOM LIGHT ──────────────────────────────────── */
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  pointer-events: none; z-index: 0;
-  transition: background var(--on-dur) var(--ease-on);
-  background: transparent;
-}
-body.is-on::after {
-  background: radial-gradient(ellipse 78% 62% at 50% 52%,
-    rgba(255,155,38,0.09) 0%,
-    rgba(215,95,0,0.05)   42%,
-    transparent           72%);
+body.is-on::after{
+  background:radial-gradient(ellipse 82% 68% at 50% 58%,
+    rgba(255,158,40,.10) 0%,
+    rgba(218,95,0,.05)   44%,
+    transparent          74%);
 }
 
 /* ── RESPONSIVE ─────────────────────────────────────────── */
-@media (max-width: 440px) {
-  :root { --lamp-w: 170px; }
-  .switch-zone { margin-top: 22px; }
-}
-@media (max-height: 680px) {
-  :root { --lamp-w: 160px; }
-  .switch-zone { margin-top: 18px; }
-}
+@media(max-width:420px){:root{--lamp-w:190px}}
+@media(max-height:660px){:root{--lamp-w:175px}}
